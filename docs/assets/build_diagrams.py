@@ -5,6 +5,7 @@ Writes, next to this file:
   build-roadmap-{light,dark}.svg   engineering phases (milestones)   -> ROADMAP
   harness-ladder-{light,dark}.svg  the agent's runtime pipeline      -> PHASES / LOOPS
   project-layout-{light,dark}.svg  repo folder map                   -> LAYOUT_*
+  agent-orchestration-{light,dark}.svg  orchestrator + agents + cost   -> BENCH
 
 Progress tracking: when a milestone is reached, update ROADMAP_MILESTONE and the
 ROADMAP statuses ("planned" | "next" | "building" | "done"). When a runtime phase
@@ -17,11 +18,11 @@ from xml.sax.saxutils import escape
 OUT = Path(__file__).parent
 
 # ---- Build roadmap: engineering phases, bottom rung first (see Plan.md §12) ----
-ROADMAP_MILESTONE = "Next: 02 · Backend"
+ROADMAP_MILESTONE = "Building: 03 · Orchestration"
 ROADMAP = [
     ("Frontend", "Next.js dashboard: jobs, providers & keys", "done"),
     ("Backend", "FastAPI, live events, encrypted key vault", "next"),
-    ("Orchestration", "Agent pipeline, free-LLM router, tools, Docker sandbox", "planned"),
+    ("Orchestration", "Agent pipeline, free-LLM router, tools, Docker sandbox", "building"),
     ("Memory & Retrieval", "Code search, repo memory", "planned"),
     ("Observability", "Traces, logs, metrics", "planned"),
     ("Guardrails", "NVIDIA NeMo rails + safety checks", "planned"),
@@ -56,21 +57,21 @@ LAYOUT_OTHER = [
 
 # ---- Agent runtime pipeline ----
 # Header label for the runtime ladder.
-MILESTONE = "Agent runtime"
+MILESTONE = "Agent runtime · runs locally from the CLI"
 
 # (title, description, kind, group, status) — listed bottom rung first.
 # kind: "code" = plain code, "cheap" = cheap/fast model, "llm" = main model
 # status: "planned" | "building" | "done"
 PHASES = [
-    ("Intake", "Parse issue, stack traces, CI logs into a task spec", "cheap", "prepare", "planned"),
-    ("Env setup", "Clone repo, detect stack, build the Docker sandbox", "code", "prepare", "planned"),
-    ("Baseline", "Run the full suite before changing anything", "code", "prepare", "planned"),
-    ("Reproduce", "Write a test that fails because of the bug", "llm", "understand", "planned"),
-    ("Localize", "Stack trace + ripgrep + symbols give suspect files", "code", "understand", "planned"),
-    ("Fix loop", "Edit, run targeted tests, read failures, repeat", "llm", "fix", "planned"),
-    ("Verify", "Full suite + lint + types, compared with baseline", "code", "fix", "planned"),
-    ("Review", "Critic checks the diff; guard blocks test tampering", "llm", "fix", "planned"),
-    ("Deliver", "Push branch, open PR with root cause and results", "cheap", "ship", "planned"),
+    ("Intake", "Parse issue, stack traces, CI logs into a task spec", "cheap", "prepare", "done"),
+    ("Env setup", "Clone repo, detect stack, build the Docker sandbox", "code", "prepare", "done"),
+    ("Baseline", "Run the full suite before changing anything", "code", "prepare", "done"),
+    ("Reproduce", "Write a test that fails because of the bug", "llm", "understand", "done"),
+    ("Localize", "Stack trace + ripgrep + symbols give suspect files", "code", "understand", "done"),
+    ("Fix loop", "Edit, run targeted tests, read failures, repeat", "llm", "fix", "done"),
+    ("Verify", "Full suite + lint + types, compared with baseline", "code", "fix", "building"),
+    ("Review", "Critic checks the diff; guard blocks test tampering", "llm", "fix", "done"),
+    ("Deliver", "Push branch, open PR with root cause and results", "cheap", "ship", "building"),
     ("Feedback", "Act on PR review comments and CI results", "llm", "ship", "planned"),
     ("Learn", "Save trajectory, repo memory and eval metrics", "cheap", "ship", "planned"),
 ]
@@ -482,10 +483,156 @@ def build_layout(theme: str) -> str:
               .replace(f'width="{w - 2}" height="{h - 2}"', f'width="{w - 2}" height="{total_h - 2}"', 1)
 
 
+# ---- Agent orchestration: measured on evals/bugs/py_cart with Groq (gpt-oss-120b), 2026-10-17 ----
+BENCH = [
+    # (label, detail, requests, input tokens, seconds)
+    ("Classic single agent", "one agent explores, reproduces and fixes", 21, 24_869, 126),
+    ("Orchestrated (default)", "context pack · scouts skipped · backup fixer not needed", 9, 12_956, 69),
+    ("All agents in parallel", "2 scouts + 2 fixers from the start", 27, 35_276, 170),
+]
+
+
+def build_orchestration(theme: str) -> str:
+    """Flow of the orchestrator and its agents, plus the measured cost of each mode."""
+    c = THEMES[theme]
+    w, h = 960, 900
+    o = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" role="img" '
+        f'aria-label="Code Fixer agent orchestration: plain-code orchestrator, context pack, optional parallel '
+        f'scouts, reproducer, staggered race of fixers in separate sandboxes, verify gate, critic, patch">'
+    ]
+    o.append(f'<defs><marker id="orc-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" '
+             f'orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="{c["rail"]}"/></marker></defs>')
+    o.append(f'<rect x="1" y="1" width="{w - 2}" height="{h - 2}" rx="14" fill="{c["bg"]}" stroke="{c["border"]}"/>')
+    o.append(text(40, 52, "Code Fixer — agent orchestration", 24, c["text"], "700"))
+    o.append(text(40, 78, "Plain code orchestrates; each agent gets a small, focused context. Parallel only where it pays.",
+                  14, c["muted"]))
+
+    cx, bw = 300, 460  # centre and width of the main column
+    kinds = {"code": "code", "cheap": "cheap LLM", "llm": "LLM"}
+
+    def node(y, title, sub, kind, x=None, width=None, dashed=False, extra=""):
+        width = width or bw
+        x = (cx - width / 2) if x is None else x
+        dash = ' stroke-dasharray="5 4"' if dashed else ""
+        out = [f'<g {extra}><rect x="{x}" y="{y}" width="{width}" height="54" rx="10" fill="{c["card"]}" '
+               f'stroke="{c["border"]}"{dash}/>',
+               text(x + 16, y + 23, title, 14.5, c["text"], "700"),
+               text(x + 16, y + 41, sub, 11.5, c["muted"])]
+        label = kinds[kind]
+        bwid = len(label) * 7 + 16
+        out.append(f'<rect x="{x + width - bwid - 12}" y="{y + 11}" width="{bwid}" height="20" rx="10" '
+                   f'fill="{c[kind + "_bg"]}"/>')
+        out.append(text(x + width - bwid / 2 - 12, y + 25, label, 11, c[kind + "_fg"], "600", "middle"))
+        out.append("</g>")
+        return "".join(out)
+
+    def edge(x1, y1, x2, y2, dashed=False):
+        mid = (y1 + y2) / 2
+        d = f"M{x1},{y1} C{x1},{mid} {x2},{mid} {x2},{y2}" if x1 != x2 else f"M{x1},{y1} L{x2},{y2}"
+        dash_attr = ' stroke-dasharray="5 4"' if dashed else ""
+        return (f'<path d="{d}" fill="none" stroke="{c["rail"]}" stroke-width="1.6" marker-end="url(#orc-arrow)"'
+                f'{dash_attr}>'
+                + ('<animate attributeName="stroke-dashoffset" from="18" to="0" dur="1.1s" repeatCount="indefinite"/>'
+                   if dashed else "") + "</path>")
+
+    ys = {"orch": 110, "pack": 196, "scouts": 290, "repro": 392, "fix": 488, "gate": 592, "critic": 676, "out": 760}
+    half = bw / 2 - 8
+    left_x, right_x = cx - bw / 2, cx + 8
+
+    o.append(node(ys["orch"], "Orchestrator", "env setup · baseline tests · localize · budgets · guards", "code"))
+    o.append(edge(cx, ys["orch"] + 54, cx, ys["pack"]))
+    o.append(node(ys["pack"], "Context pack", "exact source of matching code + nearest test file · 0 requests", "code"))
+
+    # optional parallel scouts
+    o.append(text(left_x, ys["scouts"] - 14, "only if the pack is weak · in parallel", 10.5, c["muted"]))
+    o.append(edge(cx, ys["pack"] + 54, left_x + half / 2, ys["scouts"], dashed=True))
+    o.append(edge(cx, ys["pack"] + 54, right_x + half / 2, ys["scouts"], dashed=True))
+    o.append(node(ys["scouts"], "Scout · tests", "read-only · ≤6 turns", "cheap", x=left_x, width=half, dashed=True))
+    o.append(node(ys["scouts"], "Scout · code", "read-only · ≤6 turns", "cheap", x=right_x, width=half, dashed=True))
+    o.append(edge(left_x + half / 2, ys["scouts"] + 54, cx, ys["repro"], dashed=True))
+    o.append(edge(right_x + half / 2, ys["scouts"] + 54, cx, ys["repro"], dashed=True))
+    o.append(f'<path d="M{cx + bw / 2 + 6},{ys["pack"] + 27} C{cx + bw / 2 + 40},{ys["pack"] + 27} '
+             f'{cx + bw / 2 + 40},{ys["repro"] + 27} {cx + bw / 2 + 6},{ys["repro"] + 27}" fill="none" '
+             f'stroke="{c["accent"]}" stroke-width="1.8" marker-end="url(#orc-arrow)"/>')
+    o.append(text(cx + bw / 2 + 46, ys["scouts"] + 24, "pack is", 11, c["accent"], "600"))
+    o.append(text(cx + bw / 2 + 46, ys["scouts"] + 38, "confident", 11, c["accent"], "600"))
+
+    o.append(node(ys["repro"], "Reproducer", "starts from the pack · writes a test that fails for the bug", "llm"))
+
+    # staggered race
+    o.append(edge(cx, ys["repro"] + 54, left_x + half / 2, ys["fix"]))
+    o.append(edge(cx, ys["repro"] + 54, right_x + half / 2, ys["fix"], dashed=True))
+    o.append(node(ys["fix"], "Fixer A · provider 1", "own repo copy + sandbox", "llm", x=left_x, width=half))
+    o.append(node(ys["fix"], "Fixer B · provider 2", "starts if A is still stuck after 5 turns", "llm",
+                  x=right_x, width=half, dashed=True,
+                  extra='opacity="1"><animate attributeName="opacity" values="1;1;0.35;0.35;1" '
+                        'keyTimes="0;0.55;0.62;0.95;1" dur="6s" repeatCount="indefinite"/'))
+    # winner tick on fixer A
+    o.append(f'<g opacity="0"><circle cx="{left_x + half - 18}" cy="{ys["fix"] - 2}" r="11" fill="{c["done"]}"/>'
+             + text(left_x + half - 18, ys["fix"] + 3, "✓", 12, c["card"], "700", "middle")
+             + '<animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.5;0.56;0.95;1" dur="6s" '
+               'repeatCount="indefinite"/></g>')
+    o.append(edge(left_x + half / 2, ys["fix"] + 54, cx, ys["gate"]))
+    o.append(edge(right_x + half / 2, ys["fix"] + 54, cx, ys["gate"], dashed=True))
+    o.append(node(ys["gate"], "Verify gate", "first fix that passes the full suite wins · the others stop", "code"))
+    o.append(edge(cx, ys["gate"] + 54, cx, ys["critic"]))
+    o.append(node(ys["critic"], "Critic", "one request · approve or send back to Fix", "llm"))
+    o.append(edge(cx, ys["critic"] + 54, cx, ys["out"]))
+    o.append(f'<rect x="{cx - 120}" y="{ys["out"]}" width="240" height="38" rx="19" fill="{c["ship"]}" opacity="0.15"/>')
+    o.append(f'<rect x="{cx - 120}" y="{ys["out"]}" width="240" height="38" rx="19" fill="none" stroke="{c["ship"]}"/>')
+    o.append(text(cx, ys["out"] + 24, "Verified patch → PR", 14, c["ship"], "700", "middle"))
+
+    # flowing packet down the main path
+    path = (f"M{cx},{ys['orch'] + 54} L{cx},{ys['repro']} M{cx},{ys['repro'] + 54} L{cx},{ys['out']}")
+    o.append(f'<circle r="5" fill="{c["accent"]}"><animateMotion dur="6s" repeatCount="indefinite" '
+             f'path="M{cx},{ys["orch"] + 54} L{cx},{ys["pack"]} L{cx},{ys["pack"] + 54} L{cx + bw / 2 + 30},{ys["scouts"] + 27} '
+             f'L{cx},{ys["repro"]} L{cx},{ys["repro"] + 54} L{left_x + half / 2},{ys["fix"]} L{left_x + half / 2},{ys["fix"] + 54} '
+             f'L{cx},{ys["gate"]} L{cx},{ys["out"]}"/></circle>')
+    _ = path
+
+    # measured cost panel
+    px, pw = 640, 280
+    o.append(f'<rect x="{px}" y="110" width="{pw}" height="400" rx="12" fill="{c["card"]}" stroke="{c["border"]}"/>')
+    o.append(text(px + 18, 140, "Measured cost, same bug", 14, c["text"], "700"))
+    o.append(text(px + 18, 158, "cart bug · Groq gpt-oss-120b · all fixed", 11, c["muted"]))
+    max_tok = max(b[3] for b in BENCH)
+    y = 190
+    for i, (label, detail, req, tok, sec) in enumerate(BENCH):
+        best = i == 1
+        col = c["done"] if best else c["rail"]
+        o.append(text(px + 18, y, label, 12.5, c["text"], "700" if best else "600"))
+        o.append(text(px + 18, y + 15, detail, 10, c["muted"]))
+        bar_w = (pw - 36) * tok / max_tok
+        o.append(f'<rect x="{px + 18}" y="{y + 24}" width="{pw - 36}" height="10" rx="5" fill="{c["code_bg"]}"/>')
+        o.append(f'<rect x="{px + 18}" y="{y + 24}" width="{bar_w:.1f}" height="10" rx="5" fill="{col}">'
+                 f'<animate attributeName="width" from="0" to="{bar_w:.1f}" dur="1.2s" begin="{0.2 + i * 0.25}s" '
+                 f'fill="freeze"/></rect>')
+        o.append(text(px + 18, y + 52, f"{tok / 1000:.1f}K tokens in · {req} requests · {sec}s", 11.5,
+                      c["done"] if best else c["muted"], "600" if best else "normal"))
+        y += 100
+    o.append(text(px + 18, y - 4, "Default vs classic: −57% requests,", 11.5, c["text"], "600"))
+    o.append(text(px + 18, y + 12, "−48% input tokens, ~2× faster.", 11.5, c["text"], "600"))
+
+    # legend
+    ly = 850
+    x = 40
+    for kind in ("code", "cheap", "llm"):
+        label = kinds[kind]
+        bwid = len(label) * 7 + 16
+        o.append(f'<rect x="{x}" y="{ly - 14}" width="{bwid}" height="20" rx="10" fill="{c[kind + "_bg"]}"/>')
+        o.append(text(x + bwid / 2, ly, label, 11, c[kind + "_fg"], "600", "middle"))
+        x += bwid + 10
+    o.append(text(x + 6, ly, "dashed = started only when needed · solid = always runs", 11.5, c["muted"]))
+    o.append("</svg>")
+    return "\n".join(o)
+
+
 if __name__ == "__main__":
     for name in THEMES:
         for stem, fn in (("build-roadmap", build_roadmap), ("harness-ladder", build),
-                         ("project-layout", build_layout)):
+                         ("project-layout", build_layout),
+                         ("agent-orchestration", build_orchestration)):
             out = OUT / f"{stem}-{name}.svg"
             out.write_text(fn(name), encoding="utf-8")
             print("wrote", out)

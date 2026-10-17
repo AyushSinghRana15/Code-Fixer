@@ -1,0 +1,40 @@
+[project]
+name = "code-fixer"
+version = "0.1.0"
+description = "Agent harness that reproduces bugs, fixes them in a sandbox and verifies with tests."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "openai>=3.33.0",
+    "python-dotenv>=1.2.4",
+    "rich>=15.0.0",
+    "typer>=0.27.3",
+]
+
+[project.scripts]
+fixer = "fixer.cli.main:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["fixer"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+exclude = ["evals/bugs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = ["E501", "SIM108"]  # the formatter handles line length
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.17.1",
+]

@@ -2,10 +2,11 @@
 <rect x="1" y="1" width="858" height="850" rx="14" fill="#161b22" stroke="#30363d"/>
 <text x="40" y="52" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="24" fill="#e6edf3" font-weight="700" text-anchor="start" >Code Fixer — build roadmap</text>
 <text x="40" y="78" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#9198a1" font-weight="normal" text-anchor="start" >10 engineering phases. Each one is a milestone.</text>
-<text x="820" y="40" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" fill="#db61a2" font-weight="600" text-anchor="end" >Next: 02 · Backend</text>
+<text x="820" y="40" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" fill="#db61a2" font-weight="600" text-anchor="end" >Building: 03 · Orchestration</text>
 <text x="560" y="66" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" fill="#e6edf3" font-weight="700" text-anchor="start" >Done 1 / 10 phases</text>
 <rect x="560" y="76" width="260" height="8" rx="4" fill="#21262d"/>
 <rect x="560" y="76" width="26.0" height="8" rx="4" fill="#3fb950"/>
+<rect x="586.0" y="76" width="26.0" height="8" rx="4" fill="#d29922"/>
 <rect x="40.0" y="124" width="200" height="34" rx="17" fill="#3fb950" opacity="0.15"/>
 <rect x="40.0" y="124" width="200" height="34" rx="17" fill="none" stroke="#3fb950" stroke-width="1.5"/>
 <text x="140.0" y="146" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#3fb950" font-weight="700" text-anchor="middle" >★ Production-ready agent</text>
@@ -34,13 +35,13 @@
 <rect x="200" y="641.0" width="620" height="46" rx="10" fill="#db61a2" fill-opacity="0.07" stroke="#db61a2" stroke-width="2" opacity="0"><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="linear" keyTimes="0.0000;0.1191;0.1311;0.1811;0.9700;1.0000" values="0.0;0.0;1.0;0.3;0.3;0.0"/></rect>
 <line x1="110" y1="606" x2="170" y2="606" stroke="#6e7681" stroke-width="6" stroke-linecap="round"/>
 <line x1="170" y1="606" x2="200" y2="606" stroke="#6e7681" stroke-width="1.5"/>
-<circle cx="140.0" cy="606" r="15" fill="#0d1117" stroke="#6e7681" stroke-width="2"/>
-<text x="140.0" y="610.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5" fill="#6e7681" font-weight="700" text-anchor="middle" >03</text>
-<rect x="200" y="583.0" width="620" height="46" rx="10" fill="#0d1117" stroke="#30363d"/>
+<circle cx="140.0" cy="606" r="15" fill="#0d1117" stroke="#d29922" stroke-width="2"/>
+<text x="140.0" y="610.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5" fill="#d29922" font-weight="700" text-anchor="middle" >03</text>
+<rect x="200" y="583.0" width="620" height="46" rx="10" fill="#0d1117" stroke="#d29922"/>
 <text x="218" y="603" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#e6edf3" font-weight="700" text-anchor="start" >Orchestration</text>
 <text x="218" y="620" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" fill="#9198a1" font-weight="normal" text-anchor="start" >Agent pipeline, free-LLM router, tools, Docker sandbox</text>
-<rect x="710" y="595" width="96" height="22" rx="11" fill="none" fill-opacity="1" stroke="#6e7681" stroke-width="1.2"/>
-<text x="758.0" y="610" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#6e7681" font-weight="600" text-anchor="middle" >○ planned</text>
+<rect x="710" y="595" width="96" height="22" rx="11" fill="none" fill-opacity="1" stroke="#d29922" stroke-width="1.2"/>
+<text x="758.0" y="610" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#d29922" font-weight="600" text-anchor="middle" >◐ building</text>
 <rect x="200" y="583.0" width="620" height="46" rx="10" fill="#db61a2" fill-opacity="0.07" stroke="#db61a2" stroke-width="2" opacity="0"><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="linear" keyTimes="0.0000;0.2102;0.2222;0.2722;0.9700;1.0000" values="0.0;0.0;1.0;0.3;0.3;0.0"/></rect>
 <line x1="110" y1="548" x2="170" y2="548" stroke="#6e7681" stroke-width="6" stroke-linecap="round"/>
 <line x1="170" y1="548" x2="200" y2="548" stroke="#6e7681" stroke-width="1.5"/>
