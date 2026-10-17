@@ -1,0 +1,286 @@
+# Code Fixer Agent — Plan
+
+> Living document. Update it as decisions change.
+> Last updated: 2026-10-17
+
+## 1. Goal
+
+An agent harness that connects to GitHub repos, picks up bug reports (issues, comments, failing CI), reproduces the bug in a sandbox, fixes it, runs the tests until they pass, and opens a pull request explaining the fix.
+
+**Constraint:** run it nearly free by using free-tier LLM providers.
+
+**Core principle: reproduce before fixing.** The agent first writes a test that fails because of the bug. "Tests pass" only means something if a test failed for the right reason beforehand.
+
+## 2. Decisions so far
+
+| Topic | Decision | Notes |
+|---|---|---|
+| First interface | **CLI** (`fixer run --repo owner/name --issue N`) | GitHub App and webhooks come in v1 |
+| Target repo languages | **Python, JS/TS, Java** | Build in that order; Java (Maven/Gradle) setup is the heaviest |
+| LLM | **Free-tier providers behind our own router** | See §6. Claude stays optional as a paid escalation for hard bugs |
+| Providers and keys | **User picks from multiple providers; keys go in an encrypted local vault; automatic failover** | See §7. If one service expires, the next one takes over with no effort |
+| Frontend | **Next.js + Tailwind + shadcn/ui, local single user, live updates over SSE** | v0 pages: Jobs dashboard and Providers & keys. Full design in [docs/frontend.md](docs/frontend.md) |
+| Repo layout | **Monorepo:** `backend/`, `frontend/`, `docs/` | GitHub: https://github.com/AyushSinghRana15/Code-Fixer |
+| Harness language | **Python 3.12** | Docker SDK, GitHub libs, eval tooling |
+| Sandbox | **Docker**, one container per job | Needs Docker locally: `brew install colima docker && colima start` |
+
+## 3. Architecture
+
+```
+ GitHub (issues, comments, CI failures)
+        │  webhooks (v1) / CLI (MVP)
+        ▼
+ ┌──────────────┐    ┌───────────┐    ┌─────────────────────────────┐
+ │ Gateway      │───▶│ Job Queue │───▶│ Orchestrator (per job)      │
+ │ (CLI / Fast- │    │ (Redis,   │    │  state machine + budgets    │
+ │  API + App)  │    │  v1)      │    └──────────────┬──────────────┘
+ └──────────────┘    └───────────┘                   │
+        ▲                    ┌───────────────┬───────┴───────┬───────────────┐
+        │ PR / comments      ▼               ▼               ▼               ▼
+        │            ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+        └────────────│ Agent Loop  │ │ LLM Router  │ │ Sandbox     │ │ Trajectory  │
+                     │ (tools)     │◀▶ (free tiers│ │ (Docker per │ │ Store       │
+                     └─────────────┘ │  + fallback)│ │  job)       │ │ (DB + logs) │
+                                     └─────────────┘ └─────────────┘ └─────────────┘
+```
+
+## 4. Pipeline (orchestrator state machine)
+
+Steps marked **(no LLM)** are plain code. They save requests, which matters because free tiers cap requests per day.
+
+| # | Phase | What happens | Exit condition |
+|---|---|---|---|
+| 1 | **Intake** | Parse the issue, stack traces and linked CI logs. Classify it (bug / feature / unclear). Reject anything out of scope. | Clear task spec, or a comment asking for more info |
+| 2 | **Env setup** (no LLM) | Clone at the target SHA. Detect the stack from `pyproject.toml`, `package.json`, `pom.xml`/`build.gradle`, CI workflows and `.devcontainer`. Build the image and install deps. LLM only as fallback if detection fails. | Test command runs |
+| 3 | **Baseline** (no LLM) | Run the full suite **before** changes. Record tests that already fail and flaky tests. | Baseline snapshot saved |
+| 4 | **Reproduce** | Agent writes a minimal failing test for the bug. | New test fails for the right reason |
+| 5 | **Localize** (mostly no LLM) | Stack-trace files, ripgrep and a symbol index give ranked suspect files. LLM refines the ranking. | Candidate locations |
+| 6 | **Fix loop** | Edit, run targeted tests, read failures, repeat. | Repro test passes |
+| 7 | **Verify** (no LLM) | Full suite, linter and type-check, compared with the baseline. | No new failures |
+| 8 | **Review** | A critic pass checks the diff: minimal? correct? gaming the tests? | Approved, or back to 6 |
+| 9 | **Deliver** | Push a branch and open a PR with root cause, fix, tests added and run stats. | PR opened |
+| 10 | **Feedback** (v1) | Watch PR review comments and CI, then iterate. | Merged or closed |
+
+### Stop conditions
+- **Budgets:** max iterations, **max LLM requests** (the main budget on free tiers), max wall-clock time.
+- **Stuck detection:** same failure signature N times in a row means switching strategy or giving up.
+- **Graceful failure:** post a comment with findings (likely root cause, attempted fixes, logs) instead of failing silently.
+
+## 5. Agent tools
+
+Few and simple, because free models handle small toolsets more reliably. All run inside the sandbox.
+
+| Tool | Purpose |
+|---|---|
+| `read_file(path, start, end)` | Read a line range |
+| `list_dir(path)` | Directory listing |
+| `search(regex, glob)` | ripgrep |
+| `find_symbol(name)` | Definition lookup (ctags / tree-sitter) |
+| `edit_file(path, old, new)` | Exact string replace, which keeps diffs clean |
+| `create_file(path, content)` | New files (mainly tests) |
+| `run_tests(selector)` | Structured result: passed / failed / errors plus trimmed tracebacks |
+| `run_command(cmd)` | Allowlisted, with a timeout |
+| `git_diff()` | Current changes |
+| `finish(summary)` / `give_up(reason)` | End the loop |
+
+**Output handling:** truncate long output, extract only failing assertions and tracebacks, and summarize older turns to keep context small. Groq's 8K tokens/minute cap and weaker models both make this necessary.
+
+## 6. LLM layer: free providers plus a router
+
+### Provider landscape (researched 2026-10-17; it changes often, so re-check)
+
+| Provider | Useful free models | Limits | Catch |
+|---|---|---|---|
+| **OpenRouter** `:free` | Nemotron 3 Super 120B / Ultra 550B, Gemma 4 31B, Poolside Laguna S 2.1, Cohere North Mini Code (all support tool calling) | 20 req/min. 50 req/day, or **1,000/day forever after a one-time $10 top-up** | The free model list rotates (`qwen3-coder:free` already gone). Occasional 429s. |
+| **Google AI Studio** | Gemini 3.x Flash, Gemma 4 | Per model, ~5–15 req/min | Trains on prompts outside the EU/UK. **Public repos only.** |
+| **NVIDIA API Catalog** | DeepSeek V4 Pro/Flash, Kimi K3, Nemotron | ~40 req/min | Terms allow prototyping and testing only |
+| **Groq** | gpt-oss-120b, Qwen | 30 req/min, 1,000 req/day, **8K tokens/min** | Token cap too low for the main loop. Use for small, fast tasks. |
+| **Mistral** | Codestral and others | ~$10/month in credits | Trains on data unless you opt out |
+| **Local (Ollama)** | Small models only | Unlimited | 16 GB M3 is too small for a strong coding model. Use for summaries and triage only. |
+
+No longer free: Cerebras (paid trial since July 2026), GitHub Models (retired July 30, 2026), Together AI ($5 minimum).
+
+Live OpenRouter free list: `curl -s https://openrouter.ai/api/v1/models` (filter ids ending in `:free`).
+
+### Router design (`fixer/llm/`)
+- A thin client over the `openai` SDK. Every provider above has an OpenAI-compatible endpoint, so each one is just a `base_url` and key.
+- **Quota tracker per provider and model:** requests/min, requests/day, tokens/min. Respect 429 and `retry-after`.
+- **Fallback chain** per role. Example: `fix` uses OpenRouter, then NVIDIA, then Gemini. `summarize` uses Groq, then local.
+- **Privacy rule:** private repos only go to providers that don't train on prompts.
+- **Robust tool calling:** check each tool call against its schema and send errors back to the model for repair. Fall back to a text-based tool format for models with unreliable native tool calling.
+- **Model roles:** `fix` (strongest available), `critic`, `summarize`/`triage` (cheapest and fastest).
+- Optional paid escalation (Claude) behind a flag.
+
+### Rough capacity
+A fix job is estimated at 30–60 LLM calls (to be measured). With OpenRouter's $10 tier plus the Gemini and NVIDIA fallbacks, that's roughly **15–30 fix attempts per day**.
+
+## 7. Provider management and key vault
+
+**Goal:** the user can register several LLM providers, choose which one to use, and store their API keys securely. When a key expires, credits run out or a daily quota is hit, the agent switches to the next provider by itself, even mid-job, and tells the user what happened.
+
+### 7.1 Provider catalog
+Built-in presets that only need an API key. Each preset holds the `base_url`, default models per role, known rate limits and a `trains_on_data` flag.
+
+| Preset | Kind | Notes |
+|---|---|---|
+| `openrouter` | OpenAI-compatible | Default first choice |
+| `gemini` | OpenAI-compatible endpoint | Flagged `trains_on_data` (public repos only) |
+| `nvidia` | OpenAI-compatible | Prototyping terms |
+| `groq` | OpenAI-compatible | Small tasks only (8K tokens/min) |
+| `mistral` | OpenAI-compatible | |
+| `ollama` | Local, no key | Summaries and triage |
+| `anthropic` | Native SDK | Optional paid escalation |
+| `custom` | OpenAI-compatible | User supplies `base_url` and model names; covers any new free service |
+
+### 7.2 Secure key storage (`fixer/vault/`)
+- **Storage:** a local SQLite DB at `~/.fixer/vault.db` with file mode `0600`.
+- **Encryption:** each API key is encrypted with **AES-256-GCM** (`cryptography` library) and gets its own random nonce. The DB holds only ciphertext.
+- **Master key:** kept in the **OS keychain** through `keyring` (macOS Keychain, Windows Credential Manager, Linux Secret Service). It is generated on first run and the user never handles it.
+- **Headless fallback** (servers, CI, no keychain): the master key is derived from a passphrase with **scrypt**. The passphrase comes from the `FIXER_VAULT_PASSPHRASE` env var or a prompt.
+- **Env override:** `FIXER_<PROVIDER>_API_KEY` env vars take priority over the vault, which suits CI and Docker deploys.
+- **Handling rules:**
+  - Keys are decrypted in memory only when a request is sent.
+  - They are never written to logs, trajectories or PR text. A redaction filter masks anything that looks like a stored key.
+  - They are **never passed into the sandbox container**. The LLM router runs on the host; the sandbox only runs repo code.
+  - The CLI only shows a masked form such as `sk-or-…a1b2`.
+  - Keys are entered through a hidden prompt, never as a command-line argument, so they don't land in shell history.
+
+### 7.3 Data model
+
+| Table | Key columns |
+|---|---|
+| `providers` | id, preset, label, base_url, enabled, priority, models (JSON: role → model), trains_on_data |
+| `credentials` | provider_id, ciphertext, nonce, key_hint (last 4 chars), created_at, last_validated_at |
+| `provider_status` | provider_id, state (`active` / `rate_limited` / `quota_exhausted` / `invalid_key` / `out_of_credits` / `disabled`), reason, retry_at |
+| `usage` | provider_id, model, date, requests, input_tokens, output_tokens |
+
+### 7.4 CLI
+
+```
+fixer providers list                     # all providers: status, priority, masked key, today's usage
+fixer providers add openrouter           # prompts for the key (hidden input), validates it, saves encrypted
+fixer providers add custom --base-url URL --model fix=MODEL
+fixer providers use openrouter           # make this the primary provider
+fixer providers order openrouter nvidia gemini   # set the fallback order
+fixer providers test [name]              # live check: key valid? models reachable? tool calling works?
+fixer providers rotate-key openrouter    # replace a key (e.g. after it expired)
+fixer providers disable|enable|remove NAME
+fixer run ... --provider nvidia          # one-off override for a single job
+```
+
+### 7.5 Automatic failover
+The router classifies each provider error and reacts:
+
+| Signal | Meaning | Action |
+|---|---|---|
+| 401 / 403 | Key invalid, revoked or expired | Mark `invalid_key`, switch now, tell the user to run `rotate-key` |
+| 402 / "insufficient credits" | Paid credits ran out | Mark `out_of_credits`, switch |
+| 429 with a short `retry-after` | Per-minute limit | Wait if it's brief, otherwise use the next provider |
+| 429 daily quota / tracker shows daily cap reached | Daily quota used up | Mark `quota_exhausted` until the reset time, then switch |
+| 404 model not found | Free model was rotated out | Try the provider's next model, then the next provider |
+| 5xx / timeout | Provider outage | Retry with backoff, then switch |
+
+- **Switching mid-job works** because the conversation is stored in a provider-neutral format (OpenAI-style messages). The router converts tool-call formats per provider.
+- **Privacy is respected during failover:** a private repo never fails over to a provider flagged `trains_on_data`.
+- **States recover on their own:** rate-limited and quota-exhausted providers become `active` again at `retry_at`. An invalid key stays off until the user rotates it.
+- **The user is told:** a console line during the run, a note in the PR or job summary ("switched from openrouter to nvidia: daily quota reached"), and `fixer providers list` shows why.
+- If **every** provider is unavailable, the job pauses with a checkpoint (resume with `fixer resume JOB`) instead of failing.
+
+### 7.6 Later (v1)
+- A providers page in the web dashboard: add or rotate keys, drag to reorder, live quota bars.
+- A daily background health check that tests each key and warns before a key or credit balance runs out.
+
+## 8. Features
+
+### MVP
+1. CLI: `fixer run --repo owner/name --issue N`
+2. Docker sandbox per job: no network during test runs, no secrets inside the container
+3. Test-command detection for Python (pytest), JS/TS (jest/vitest), Java (Maven/Gradle)
+4. Baseline, reproduce, fix and verify loop with budgets and stuck detection
+5. LLM router with free providers, quota tracking and fallback
+6. **Multi-provider management:** the user picks a provider, sets the fallback order and gets automatic failover when a key expires or a quota runs out (§7)
+7. **Encrypted key vault:** AES-256-GCM in SQLite, master key in the OS keychain (§7.2)
+8. **Test-tampering guard:** reject diffs that delete or weaken existing tests or add skip/xfail. New tests are allowed.
+9. PR creation with a structured description
+10. Full trajectory log (every prompt, tool call and output) as JSON, with keys redacted
+
+### v1
+11. GitHub App with webhook triggers: `agent-fix` label, `@fixer fix this` comment, red CI on the default branch
+12. PR review-comment loop: a reviewer comments and the agent revises
+13. Critic/self-review pass before opening the PR
+14. Web dashboard: job status, trajectory replay, requests used per job, providers page (add/rotate keys, reorder, quota bars)
+15. Per-repo config `.fixer.yml`: test command, setup steps, allowed paths, budgets
+16. Cache Docker images and deps per repo and lockfile hash
+
+### Advanced
+17. Parallel candidate fixes in separate sandboxes; pick the best (tests pass, smallest diff, critic score). Costs more requests.
+18. Repo memory: store learned conventions and setup quirks for the next job
+19. Flaky-test detection (re-run failures before trusting them)
+20. Human-in-the-loop mode: post the plan after localize and wait for approval
+21. Security pass on the diff: secret scanner and SAST
+22. Paid escalation to Claude for bugs the free models can't solve
+
+## 9. Evaluation
+
+Free models rotate and vary a lot in quality, so **evals drive model choice**.
+- **Local bug set:** small repos (Python / JS / Java) with planted bugs and known fixes. Fast and cheap to run.
+- **SWE-bench Verified subset** (~20 tasks) for an external benchmark.
+- Metrics: resolve rate, requests per job, wall time, test-tampering rejections, stuck/give-up rate.
+- Re-run when OpenRouter's free list changes and update the router's fallback order.
+
+## 10. Project layout
+
+```
+backend/
+  fixer/
+    api/              # FastAPI routes + SSE event stream for the frontend
+    cli/              # `fixer` command entrypoint
+    orchestrator/     # state machine, budgets, stop logic
+    agent/            # agent loop, prompts, context management
+    llm/              # provider catalog, router, quotas, failover, tool-call repair
+    vault/            # encrypted key storage (SQLite + AES-GCM + OS keychain)
+    tools/            # file ops, search, edit, run_tests
+    sandbox/          # docker lifecycle, env detection, caching
+    github/           # auth, PR creation, comments (webhooks in v1)
+    guards/           # test-tampering, path allowlist, secret scan
+    store/            # DB models, job store, trajectory logging
+    evals/            # local bug set + SWE-bench runner
+  tests/
+frontend/             # Next.js + Tailwind + shadcn/ui; see docs/frontend.md §7
+docs/
+  frontend.md         # frontend design + the API/SSE contract it needs
+```
+
+## 11. Tech stack
+
+| Layer | Choice |
+|---|---|
+| Language | Python 3.12 |
+| LLM client | `openai` SDK (OpenAI-compatible endpoints) behind our router |
+| Key vault | `cryptography` (AES-256-GCM, scrypt) + `keyring` (OS keychain) + SQLite |
+| Sandbox | Docker (`docker` SDK). Later gVisor/Firecracker for untrusted repos |
+| GitHub | PAT for the MVP, then a GitHub App (installation tokens) in v1 |
+| API / webhooks | FastAPI: REST + SSE for the frontend (v0); webhooks in v1 |
+| Queue | Redis + `arq` (v1; MVP runs inline) |
+| DB | SQLite, later Postgres (SQLModel) |
+| Frontend | Next.js (App Router) + TypeScript + Tailwind + shadcn/ui + `next-themes` |
+
+## 12. Milestones
+
+| Week | Deliverable |
+|---|---|
+| 1 | Sandbox, env detection, baseline test run on sample repos (no LLM yet). Key vault, provider catalog and `fixer providers` CLI. LLM router skeleton with quota tracking and failover. |
+| 2 | Agent loop and tools. Fixes a planted bug in a toy Python repo from the CLI. **Local eval set started.** Frontend v0 shell (layout, both pages) running on mock data. |
+| 3 | Reproduce-first phase, guards, budgets, stuck detection, opens a real PR. JS/TS support. FastAPI REST + SSE; frontend wired to real data. |
+| 4 | Eval run across free models to pick the router order. SWE-bench subset baseline. Java support. |
+| 5+ | GitHub App and webhooks, review-comment loop, frontend v1 (job detail page, new job form), parallel candidates. |
+
+## 13. Open questions
+- Which free model is best for the `fix` role? To be decided by the week-4 eval.
+- Is the one-time $10 OpenRouter top-up acceptable? It raises the free daily limit from 50 to 1,000 requests.
+- Docker runtime choice: Colima or OrbStack.
+
+## Sources (provider research)
+- OpenRouter, *Free LLM APIs compared* (updated 2026-09-24): https://openrouter.ai/blog/tutorials/free-llm-apis-compared/
+- Klymentiev, *Free LLM APIs* (verified 2026-09-25): https://klymentiev.com/blog/free-llm-api
+- TrueFoundry, *OpenRouter rate limits*: https://www.truefoundry.com/es/blog/openrouter-rate-limits-your-free-tier-depends-on-what-youve-already-paid
