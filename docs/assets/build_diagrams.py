@@ -71,7 +71,7 @@ PHASES = [
     ("Fix loop", "Edit, run targeted tests, read failures, repeat", "llm", "fix", "done"),
     ("Verify", "Full suite + lint + types, compared with baseline", "code", "fix", "building"),
     ("Review", "Critic checks the diff; guard blocks test tampering", "llm", "fix", "done"),
-    ("Deliver", "Push branch, open PR with root cause and results", "cheap", "ship", "building"),
+    ("Deliver", "Push branch, open PR with root cause and results", "cheap", "ship", "done"),
     ("Feedback", "Act on PR review comments and CI results", "llm", "ship", "planned"),
     ("Learn", "Save trajectory, repo memory and eval metrics", "cheap", "ship", "planned"),
 ]

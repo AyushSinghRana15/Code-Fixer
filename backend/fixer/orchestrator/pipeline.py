@@ -28,6 +28,9 @@ from fixer.agent import prompts
 from fixer.agent.loop import run_agent
 from fixer.config import Budget, fixer_home
 from fixer.events import EventBus
+from fixer.github import git as gh_git
+from fixer.github.client import GitHubClient, GitHubError
+from fixer.github.workflow import GitHubTarget, failure_comment, open_pull_request
 from fixer.guards.tamper import check_diff
 from fixer.llm.providers import ROLE_PREFERENCE
 from fixer.llm.router import LLMRouter, NoProviderAvailable, RequestBudgetExceeded
@@ -63,6 +66,19 @@ SCOUTS = [
 ]
 
 
+@dataclass
+class GitHubJob:
+    """Set when the job comes from a GitHub issue: clone instead of copy, open a PR at the end."""
+
+    target: GitHubTarget
+    client: GitHubClient
+    token: str | None
+    open_pr: bool = True
+    draft: bool = True
+    comment_on_failure: bool = False
+    host: str = "https://github.com"  # tests point this at a local bare repo
+
+
 class Stop(Exception):
     """Ends the job (or one agent) early with a status and a human-readable reason."""
 
@@ -83,6 +99,7 @@ class JobConfig:
     scouts: str = "auto"  # LLM scouts: auto (only when the context pack is weak) | always | never
     candidates: int = 1  # fixer agents (>1 = race in separate sandboxes)
     stagger: int = 5  # backup fixers start after the first has used this many turns (0 = all at once)
+    github: GitHubJob | None = None
     job_id: str = field(default_factory=lambda: f"j-{datetime.now():%Y%m%d-%H%M%S}-{uuid4().hex[:4]}")
 
 
@@ -106,6 +123,8 @@ class JobResult:
     agents: dict[str, dict[str, int]] = field(default_factory=dict)  # per-agent requests and tokens
     seconds: float = 0.0
     applied: bool = False
+    pr_url: str | None = None
+    branch: str | None = None
 
 
 class Job:
@@ -182,13 +201,10 @@ class Job:
         finally:
             if self.sandbox:
                 self.sandbox.stop()
-            usage = self.router.summary()
-            self.result.requests = usage["requests"]
-            self.result.tokens = usage["tokens"]
-            self.result.agents = usage["agents"]
-            self.result.seconds = round(time.monotonic() - self.started, 1)
+            self._snapshot_usage()
             if self.ws and not self.result.diff:
                 self.result.diff = self.ws.diff()
+            self._report_failure()
             (self.job_dir / "result.json").write_text(json.dumps(asdict(self.result), indent=2, default=str))
             self.emit("job.finished", status=self.result.status, reason=self.result.reason)
         return self.result
@@ -200,6 +216,12 @@ class Job:
         return {"chars": len(self.cfg.issue)}
 
     def _env(self) -> dict[str, Any]:
+        gh = self.cfg.github
+        if gh:
+            source = self.job_dir / "source"
+            gh_git.clone(gh_git.clone_url(gh.target.ref.slug, gh.host), source, gh.target.default_branch, gh.token)
+            self.cfg.repo = source  # the clean clone; the PR is built from it at the end
+            self.emit("github.cloned", repo=gh.target.ref.slug, branch=gh.target.default_branch)
         self.ws = Workspace.create(self.cfg.repo, self.job_dir / "repo")
         try:
             self.spec = detect(self.ws.root, has_uv=has_uv() and self.cfg.sandbox == "local")
@@ -643,6 +665,23 @@ class Job:
         self.emit("review.verdict", agent="critic", approve=verdict["approve"], concerns=verdict["concerns"])
         return verdict
 
+    def _snapshot_usage(self) -> None:
+        usage = self.router.summary()
+        self.result.requests = usage["requests"]
+        self.result.tokens = usage["tokens"]
+        self.result.agents = usage["agents"]
+        self.result.seconds = round(time.monotonic() - self.started, 1)
+
+    def _report_failure(self) -> None:
+        gh = self.cfg.github
+        if not gh or not gh.comment_on_failure or self.result.status not in ("gave_up", "failed"):
+            return
+        try:
+            gh.client.comment(gh.target.ref, failure_comment(gh.target, self.result))
+            self.emit("github.commented", issue=str(gh.target.ref))
+        except GitHubError as err:
+            self.emit("note", text=f"couldn't comment on the issue: {err}")
+
     def _deliver(self) -> dict[str, Any]:
         assert self.ws
         diff = self.ws.diff()
@@ -653,6 +692,20 @@ class Job:
         self.result.patch_path = str(patch)
         if self.result.status != "needs_review":
             self.result.status = "fixed"
+        gh = self.cfg.github
+        if gh and gh.open_pr:
+            self._snapshot_usage()  # the PR body reports requests, tokens and per-agent usage
+            try:
+                pr = open_pull_request(
+                    gh.client, gh.target, self.cfg.repo, patch, self.result, gh.token, draft=gh.draft, host=gh.host
+                )
+            except GitHubError as err:
+                self.result.reason = f"fix verified, but opening the PR failed: {err}"
+                self.emit("note", text=self.result.reason)
+                return {"patch": str(patch), "pr": "failed"}
+            self.result.pr_url, self.result.branch = pr["url"], pr["branch"]
+            self.emit("github.pr_opened", url=pr["url"], branch=pr["branch"], draft=gh.draft)
+            return {"patch": str(patch), "pr": pr["url"]}
         if self.cfg.apply:
             check = subprocess.run(
                 ["git", "apply", "--check", str(patch)], cwd=self.cfg.repo, capture_output=True, text=True

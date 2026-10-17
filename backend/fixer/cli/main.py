@@ -107,6 +107,12 @@ class Renderer:
                 console.print("  [green]✓ reviewer approved[/]")
             else:
                 console.print("  [yellow]reviewer concerns:[/] " + "; ".join(d["concerns"])[:300])
+        elif t == "github.cloned":
+            console.print(f"  [dim]cloned {d['repo']} ({d['branch']})[/]")
+        elif t == "github.pr_opened":
+            console.print(f"  [bold green]⇪ opened {'draft ' if d['draft'] else ''}PR:[/] {d['url']}")
+        elif t == "github.commented":
+            console.print(f"  [dim]commented findings on {d['issue']}[/]")
         elif t == "note":
             console.print(f"  [dim]note: {d['text']}[/]")
 
@@ -121,74 +127,70 @@ def build_router(max_requests: int, private: bool, bus: EventBus, only: str | No
     )
 
 
-@app.command()
-def run(
-    repo: Annotated[Path, typer.Option("--repo", "-r", help="Path to a local repository.")],
-    issue: Annotated[str | None, typer.Option("--issue", "-i", help="Bug report text.")] = None,
-    issue_file: Annotated[Path | None, typer.Option("--issue-file", help="Read the bug report from a file.")] = None,
-    sandbox: Annotated[str, typer.Option(help="local or docker")] = "",
-    max_requests: Annotated[int, typer.Option(help="LLM request budget for this job.")] = 60,
-    max_minutes: Annotated[int, typer.Option(help="Time budget for this job.")] = 20,
-    provider: Annotated[str | None, typer.Option(help="Use only this provider (e.g. groq).")] = None,
-    public: Annotated[
-        bool, typer.Option("--public", help="Repo is public: allow providers that train on data.")
-    ] = False,
-    apply: Annotated[bool, typer.Option("--apply", help="Apply the verified patch to your repo.")] = False,
-    scouts: Annotated[
-        str, typer.Option(help="LLM scouts: auto (only if the code-built context pack is weak), always, never.")
-    ] = "auto",
-    candidates: Annotated[
-        int, typer.Option(help="Fixer agents racing in separate sandboxes (default: one per provider, max 2).")
-    ] = 0,
-    context_pack: Annotated[
-        bool, typer.Option("--context-pack/--no-context-pack", help="Build the code-only context pack.")
-    ] = True,
-    stagger: Annotated[
-        int, typer.Option(help="Start backup fixers after the first has used this many turns (0 = all at once).")
-    ] = 5,
-    verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
+# Options shared by `run` (local repo) and `fix` (GitHub issue)
+Sandbox = Annotated[str, typer.Option(help="local or docker")]
+MaxRequests = Annotated[int, typer.Option(help="LLM request budget for this job.")]
+MaxMinutes = Annotated[int, typer.Option(help="Time budget for this job.")]
+OnlyProvider = Annotated[str | None, typer.Option("--provider", help="Use only this provider (e.g. groq).")]
+Scouts = Annotated[
+    str, typer.Option(help="LLM scouts: auto (only if the code-built context pack is weak), always, never.")
+]
+Candidates = Annotated[
+    int, typer.Option(help="Fixer agents racing in separate sandboxes (default: one per provider, max 2).")
+]
+Stagger = Annotated[
+    int, typer.Option(help="Start backup fixers after the first has used this many turns (0 = all at once).")
+]
+ContextPackOpt = Annotated[
+    bool, typer.Option("--context-pack/--no-context-pack", help="Build the code-only context pack.")
+]
+Verbose = Annotated[bool, typer.Option("--verbose", "-v")]
+
+
+def _execute(
+    *,
+    repo_label: str,
+    private: bool,
+    max_requests: int,
+    provider: str | None,
+    verbose: bool,
+    extra_secrets: list[str] | None = None,
+    **job_kwargs,
 ) -> None:
-    """Reproduce a bug with a failing test, fix it, and verify the fix."""
-    load_env()
+    """Build the router and job, stream events to the terminal, then print the result."""
+    from fixer.config import fixer_home
     from fixer.orchestrator.pipeline import Job, JobConfig
     from fixer.store.trajectory import TrajectoryLog
 
-    text = issue or (issue_file.read_text() if issue_file else "")
-    if not text.strip():
-        console.print("[red]Give the bug report with --issue or --issue-file.[/]")
-        raise typer.Exit(2)
-    kind = sandbox or os.environ.get("FIXER_SANDBOX", "local")
+    kind = job_kwargs.pop("sandbox") or os.environ.get("FIXER_SANDBOX", "local")
     if kind == "local":
         console.print("[dim]Sandbox: local (no isolation; only use on repos you trust).[/]")
-
     bus = EventBus(Renderer(verbose))
-    router = build_router(max_requests, private=not public, bus=bus, only=provider)
+    router = build_router(max_requests, private=private, bus=bus, only=provider)
+    candidates = job_kwargs.pop("candidates") or min(2, len(router.providers))
+    max_minutes = job_kwargs.pop("max_minutes")
     cfg = JobConfig(
-        repo=repo,
-        issue=text,
         sandbox=kind,
         budget=Budget(max_requests=max_requests, max_seconds=max_minutes * 60),
-        apply=apply,
-        scouts=scouts,
-        candidates=candidates or min(2, len(router.providers)),
-        stagger=stagger,
-        context_pack=context_pack,
+        candidates=candidates,
+        **job_kwargs,
     )
-    secrets = [k for _, k in configured() if k]
-    from fixer.config import fixer_home
-
+    secrets = [k for _, k in configured() if k] + (extra_secrets or [])
     log = TrajectoryLog(fixer_home() / "runs" / cfg.job_id / "events.jsonl", secrets)
     bus.add(log)
     console.print(
-        f"[bold]Job {cfg.job_id}[/] · repo {repo} · providers: "
+        f"[bold]Job {cfg.job_id}[/] · {repo_label} · providers: "
         + ", ".join(p.spec.id for p in router.providers)
         + f" · scouts: {cfg.scouts} · fixers: {cfg.candidates} (stagger {cfg.stagger})"
+        + (" · private repo" if private else "")
     )
     result = Job(cfg, router, bus).run()
     log.close()
 
     color = {"fixed": "green", "needs_review": "yellow", "paused": "yellow"}.get(result.status, "red")
     lines = [f"[bold {color}]{result.status.upper()}[/]  {result.reason}".rstrip()]
+    if result.pr_url:
+        lines.append(f"[bold]Pull request:[/] {result.pr_url}  (branch {result.branch})")
     if result.repro_test:
         lines.append(f"Reproduction test: {result.repro_test}")
     if result.summary:
@@ -203,16 +205,13 @@ def run(
         f"{tok.get('output', 0):,} out · {result.seconds:.0f}s"
     )
     lines.append(f"Run folder: {result.job_dir}")
-    if result.patch_path:
-        lines.append(
-            "Patch: "
-            + result.patch_path
-            + (
-                "  [green](applied to your repo)[/]"
-                if result.applied
-                else f"\nApply with: git -C {repo} apply {result.patch_path}"
-            )
+    if result.patch_path and not result.pr_url:
+        hint = (
+            "  [green](applied to your repo)[/]"
+            if result.applied
+            else (f"\nApply with: git -C {cfg.repo} apply {result.patch_path}" if not cfg.github else "")
         )
+        lines.append("Patch: " + result.patch_path + hint)
     console.print()
     console.print(Panel("\n".join(lines), title="Result", expand=False))
     if result.agents:
@@ -223,6 +222,119 @@ def run(
     if result.diff and result.status in ("fixed", "needs_review"):
         console.print(Syntax(result.diff, "diff", theme="ansi_dark", word_wrap=True))
     raise typer.Exit(0 if result.status == "fixed" else 1)
+
+
+@app.command()
+def run(
+    repo: Annotated[Path, typer.Option("--repo", "-r", help="Path to a local repository.")],
+    issue: Annotated[str | None, typer.Option("--issue", "-i", help="Bug report text.")] = None,
+    issue_file: Annotated[Path | None, typer.Option("--issue-file", help="Read the bug report from a file.")] = None,
+    sandbox: Sandbox = "",
+    max_requests: MaxRequests = 60,
+    max_minutes: MaxMinutes = 20,
+    provider: OnlyProvider = None,
+    public: Annotated[
+        bool, typer.Option("--public", help="Repo is public: allow providers that train on data.")
+    ] = False,
+    apply: Annotated[bool, typer.Option("--apply", help="Apply the verified patch to your repo.")] = False,
+    scouts: Scouts = "auto",
+    candidates: Candidates = 0,
+    context_pack: ContextPackOpt = True,
+    stagger: Stagger = 5,
+    verbose: Verbose = False,
+) -> None:
+    """Fix a bug in a local repository: reproduce it with a failing test, fix it, verify the fix."""
+    load_env()
+    text = issue or (issue_file.read_text() if issue_file else "")
+    if not text.strip():
+        console.print("[red]Give the bug report with --issue or --issue-file.[/]")
+        raise typer.Exit(2)
+    _execute(
+        repo_label=f"repo {repo}",
+        private=not public,
+        max_requests=max_requests,
+        provider=provider,
+        verbose=verbose,
+        repo=repo,
+        issue=text,
+        sandbox=sandbox,
+        max_minutes=max_minutes,
+        apply=apply,
+        scouts=scouts,
+        candidates=candidates,
+        stagger=stagger,
+        context_pack=context_pack,
+    )
+
+
+@app.command()
+def fix(
+    issue: Annotated[
+        str, typer.Argument(help="GitHub issue: https://github.com/owner/repo/issues/12 or owner/repo#12")
+    ],
+    pr: Annotated[bool, typer.Option("--pr/--no-pr", help="Open a pull request with the verified fix.")] = True,
+    draft: Annotated[bool, typer.Option("--draft/--ready", help="Open the PR as a draft (default) or ready.")] = True,
+    comment_on_failure: Annotated[
+        bool, typer.Option("--comment-on-failure", help="If it can't fix the bug, comment its findings on the issue.")
+    ] = False,
+    sandbox: Sandbox = "",
+    max_requests: MaxRequests = 60,
+    max_minutes: MaxMinutes = 20,
+    provider: OnlyProvider = None,
+    scouts: Scouts = "auto",
+    candidates: Candidates = 0,
+    context_pack: ContextPackOpt = True,
+    stagger: Stagger = 5,
+    verbose: Verbose = False,
+) -> None:
+    """Fix a GitHub issue: clone the repo, reproduce, fix and verify, then open a pull request."""
+    load_env()
+    from fixer.github.client import GitHubClient, GitHubError, find_token, parse_issue_ref
+    from fixer.github.workflow import prepare
+    from fixer.orchestrator.pipeline import GitHubJob
+
+    try:
+        ref = parse_issue_ref(issue)
+        token = find_token()
+        if not token:
+            console.print(
+                "[yellow]No GitHub token found (FIXER_GITHUB_TOKEN, GITHUB_TOKEN or `gh auth login`). "
+                "Public repos can still be read, but no PR can be opened.[/]"
+            )
+        client = GitHubClient(token)
+        target = prepare(client, ref)
+    except GitHubError as err:
+        console.print(f"[red]{err}[/]")
+        raise typer.Exit(2) from err
+    if (pr or comment_on_failure) and not token:
+        console.print("[red]A token is needed to open PRs or comment. Use --no-pr to only produce a patch.[/]")
+        raise typer.Exit(2)
+
+    console.print(
+        f"[bold]{ref}[/] · {target.title}\n[dim]{target.issue_url} · default branch "
+        f"{target.default_branch} · {'private' if target.private else 'public'} · "
+        f"{'push access' if target.can_push else 'will push to your fork'}[/]"
+    )
+    gh = GitHubJob(
+        target=target, client=client, token=token, open_pr=pr, draft=draft, comment_on_failure=comment_on_failure
+    )
+    _execute(
+        repo_label=str(ref),
+        private=target.private,
+        max_requests=max_requests,
+        provider=provider,
+        verbose=verbose,
+        extra_secrets=[token] if token else [],
+        repo=Path("."),
+        issue=target.issue_text,
+        sandbox=sandbox,
+        max_minutes=max_minutes,
+        scouts=scouts,
+        candidates=candidates,
+        stagger=stagger,
+        context_pack=context_pack,
+        github=gh,
+    )
 
 
 @providers_app.command("list")

@@ -4,10 +4,10 @@
 <text x="40" y="52" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="24" fill="#1f2328" font-weight="700" text-anchor="start" >Code Fixer — harness ladder</text>
 <text x="40" y="78" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#59636e" font-weight="normal" text-anchor="start" >Each rung must pass before the agent climbs. When a check fails, it loops back down.</text>
 <text x="920" y="40" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" fill="#59636e" font-weight="600" text-anchor="end" >Agent runtime · runs locally from the CLI</text>
-<text x="660" y="66" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" fill="#1f2328" font-weight="700" text-anchor="start" >Built 7 / 11 phases</text>
+<text x="660" y="66" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" fill="#1f2328" font-weight="700" text-anchor="start" >Built 8 / 11 phases</text>
 <rect x="660" y="76" width="260" height="8" rx="4" fill="#eaeef2"/>
-<rect x="660" y="76" width="165.45454545454547" height="8" rx="4" fill="#1a7f37"/>
-<rect x="825.4545454545455" y="76" width="47.27272727272727" height="8" rx="4" fill="#9a6700"/>
+<rect x="660" y="76" width="189.0909090909091" height="8" rx="4" fill="#1a7f37"/>
+<rect x="849.0909090909091" y="76" width="23.636363636363637" height="8" rx="4" fill="#9a6700"/>
 <g><rect x="177.0" y="122" width="176" height="34" rx="17" fill="#1a7f37" opacity="0.15"/><rect x="177.0" y="122" width="176" height="34" rx="17" fill="none" stroke="#1a7f37" stroke-width="1.5"/><text x="265.0" y="144" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#1a7f37" font-weight="700" text-anchor="middle" >✓ Bug fixed &amp; merged</text><rect x="177.0" y="122" width="176" height="34" rx="17" fill="#1a7f37" opacity="0"><animate attributeName="opacity" dur="14s" repeatCount="indefinite" keyTimes="0;0.850;0.880;0.97;1" values="0;0;0.35;0.2;0"/></rect></g>
 <line x1="230" y1="166" x2="230" y2="894" stroke="#8c959f" stroke-width="6" stroke-linecap="round"/>
 <line x1="300" y1="166" x2="300" y2="894" stroke="#8c959f" stroke-width="6" stroke-linecap="round"/>
@@ -129,16 +129,16 @@
 <rect x="330" y="372.0" width="590" height="52" rx="10" fill="#bc4c00" fill-opacity="0.08" stroke="#bc4c00" stroke-width="2.5" opacity="0"><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="linear" keyTimes="0.0000;0.6698;0.6818;0.7318;0.9700;1.0000" values="0.0;0.0;1.0;0.3;0.3;0.0"/></rect>
 <line x1="230" y1="332" x2="300" y2="332" stroke="#8c959f" stroke-width="6" stroke-linecap="round"/>
 <line x1="300" y1="332" x2="330" y2="332" stroke="#8c959f" stroke-width="1.5"/>
-<circle cx="265.0" cy="332" r="14" fill="#ffffff" stroke="#1a7f37" stroke-width="2"/>
-<text x="265.0" y="336.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#1a7f37" font-weight="700" text-anchor="middle" >9</text>
+<circle cx="265.0" cy="332" r="14" fill="#1a7f37" stroke="#1a7f37" stroke-width="2"/>
+<text x="265.0" y="336.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#ffffff" font-weight="700" text-anchor="middle" >9</text>
 <rect x="330" y="306.0" width="590" height="52" rx="10" fill="#ffffff" stroke="#d0d7de"/>
 <rect x="330" y="306.0" width="5" height="52" rx="2.5" fill="#1a7f37"/>
 <text x="350" y="328" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328" font-weight="700" text-anchor="start" >Deliver</text>
 <text x="350" y="347" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" fill="#59636e" font-weight="normal" text-anchor="start" >Push branch, open PR with root cause and results</text>
 <rect x="822" y="321" width="84" height="22" rx="11" fill="#ddf4ff"/>
 <text x="864.0" y="336" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#0969da" font-weight="600" text-anchor="middle" >cheap LLM</text>
-<rect x="722" y="321" width="92" height="22" rx="11" fill="none" stroke="#9a6700" stroke-width="1.2"/>
-<text x="768.0" y="336" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#9a6700" font-weight="600" text-anchor="middle" >◐ building</text>
+<rect x="722" y="321" width="92" height="22" rx="11" fill="none" stroke="#1a7f37" stroke-width="1.2"/>
+<text x="768.0" y="336" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#1a7f37" font-weight="600" text-anchor="middle" >✓ done</text>
 <rect x="330" y="306.0" width="590" height="52" rx="10" fill="#1a7f37" fill-opacity="0.08" stroke="#1a7f37" stroke-width="2.5" opacity="0"><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="linear" keyTimes="0.0000;0.7292;0.7412;0.7912;0.9700;1.0000" values="0.0;0.0;1.0;0.3;0.3;0.0"/></rect>
 <line x1="230" y1="266" x2="300" y2="266" stroke="#8c959f" stroke-width="6" stroke-linecap="round"/>
 <line x1="300" y1="266" x2="330" y2="266" stroke="#8c959f" stroke-width="1.5"/>

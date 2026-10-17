@@ -2,7 +2,7 @@
 
 An autonomous agent that connects to GitHub repos, reproduces reported bugs in a sandbox, fixes them, runs the tests until they pass, and opens a pull request explaining the fix. It's designed to run **nearly free** on free-tier LLM providers.
 
-> **Status:** the agent works end to end on local repos from the CLI (phase 03, Orchestration, is in progress: GitHub PRs and the Docker sandbox are next). The dashboard (phase 01) runs on mock data. See [Plan.md](Plan.md) for the full design.
+> **Status:** the agent fixes GitHub issues end to end from the CLI and opens pull requests (phase 03, Orchestration, is in progress: the Docker sandbox is next). The dashboard (phase 01) runs on mock data. See [Plan.md](Plan.md) for the full design.
 
 ## Quick start
 
@@ -11,10 +11,11 @@ cd backend
 cp .env.example .env          # then add at least one free key, e.g. FIXER_OPENROUTER_API_KEY
 uv sync
 uv run fixer providers test   # checks each key and that tool calling works
-uv run fixer run --repo evals/bugs/py_cart --issue-file evals/bugs/py_cart/ISSUE.md
+uv run fixer run --repo evals/bugs/py_cart --issue-file evals/bugs/py_cart/ISSUE.md   # a local repo
+uv run fixer fix https://github.com/owner/repo/issues/12                            # a GitHub issue
 ```
 
-The agent works on a private copy of the repo and never edits yours. It prints the verified diff and saves a patch; add `--apply` to apply it.
+`fixer run` works on a private copy of a local repo and never edits yours; it prints the verified diff and saves a patch (`--apply` applies it). `fixer fix` reads the issue, clones the repo, and once the fix is verified pushes a branch (to your fork if you can't push to the repo) and opens a **draft** PR with the root cause, the reproduction test and before/after test results. It uses `FIXER_GITHUB_TOKEN`, `GITHUB_TOKEN` or your `gh` login.
 
 ## Build roadmap
 
@@ -132,7 +133,7 @@ deploy/              Docker, compose, CI
 - git and ripgrep (`rg`)
 - At least one free LLM API key (OpenRouter recommended; Groq works well as a fast fallback)
 - Docker for the isolated sandbox (on macOS: `brew install colima docker && colima start`). Until then, `--sandbox local` runs tests in a private copy on your machine with no isolation, so only use it on repos you trust.
-- Later: a GitHub token with repo access (for opening PRs)
+- For `fixer fix`: a GitHub token with the `repo` scope, or a `gh auth login` session
 
 ## Providers and keys
 
