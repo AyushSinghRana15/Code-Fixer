@@ -3,7 +3,7 @@
 <rect x="1" y="1" width="958" height="1148" rx="14" fill="#161b22" stroke="#30363d"/>
 <text x="40" y="52" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="24" fill="#e6edf3" font-weight="700" text-anchor="start" >Code Fixer — harness ladder</text>
 <text x="40" y="78" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#9198a1" font-weight="normal" text-anchor="start" >Each rung must pass before the agent climbs. When a check fails, it loops back down.</text>
-<text x="920" y="40" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" fill="#9198a1" font-weight="600" text-anchor="end" >Milestone 0 · Planning</text>
+<text x="920" y="40" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" fill="#9198a1" font-weight="600" text-anchor="end" >Agent runtime</text>
 <text x="660" y="66" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" fill="#e6edf3" font-weight="700" text-anchor="start" >Built 0 / 11 phases</text>
 <rect x="660" y="76" width="260" height="8" rx="4" fill="#21262d"/>
 <g><rect x="177.0" y="122" width="176" height="34" rx="17" fill="#3fb950" opacity="0.15"/><rect x="177.0" y="122" width="176" height="34" rx="17" fill="none" stroke="#3fb950" stroke-width="1.5"/><text x="265.0" y="144" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#3fb950" font-weight="700" text-anchor="middle" >✓ Bug fixed &amp; merged</text><rect x="177.0" y="122" width="176" height="34" rx="17" fill="#3fb950" opacity="0"><animate attributeName="opacity" dur="14s" repeatCount="indefinite" keyTimes="0;0.850;0.880;0.97;1" values="0;0;0.35;0.2;0"/></rect></g>
