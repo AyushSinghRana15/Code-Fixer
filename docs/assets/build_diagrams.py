@@ -17,10 +17,10 @@ from xml.sax.saxutils import escape
 OUT = Path(__file__).parent
 
 # ---- Build roadmap: engineering phases, bottom rung first (see Plan.md §12) ----
-ROADMAP_MILESTONE = "Next: 01 · Frontend"
+ROADMAP_MILESTONE = "Next: 02 · Backend"
 ROADMAP = [
-    ("Frontend", "Next.js dashboard: jobs, providers & keys", "next"),
-    ("Backend", "FastAPI, live events, encrypted key vault", "planned"),
+    ("Frontend", "Next.js dashboard: jobs, providers & keys", "done"),
+    ("Backend", "FastAPI, live events, encrypted key vault", "next"),
     ("Orchestration", "Agent pipeline, free-LLM router, tools, Docker sandbox", "planned"),
     ("Memory & Retrieval", "Code search, repo memory", "planned"),
     ("Observability", "Traces, logs, metrics", "planned"),

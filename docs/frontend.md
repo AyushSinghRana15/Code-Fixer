@@ -8,15 +8,27 @@
 | Topic | Decision |
 |---|---|
 | Stack | **Next.js (App Router) + TypeScript + Tailwind** |
-| Components | **shadcn/ui** (copied into `src/components/ui`) |
-| Theme | **Dark + light**, follows the system setting, with a manual toggle |
+| Components | **shadcn/ui**, "base-nova" style built on **Base UI** (copied into `src/components/ui`). Dialogs/menus/tooltips use the `render` prop instead of Radix's `asChild` |
+| Theme | **Dark + light**, follows the system setting, with a manual toggle. Done with an inline `<head>` script (Next.js 16 guide), not `next-themes` |
 | Users | **Single user, local only**: runs on localhost, no login |
 | Live updates | **Server-Sent Events (SSE)** from the backend |
-| v0 pages | **Jobs dashboard** and **Providers & keys** |
+| v0 pages | **Home** (`/`), **Jobs dashboard** and **Providers & keys** |
+| Motion | React `<ViewTransition>` route transitions (no animation library): directional slide home ↔ dashboard, logo morph, crossfade between dashboard pages. All motion respects `prefers-reduced-motion` |
+| Palette | Minimal: neutrals plus one accent (`--brand`), with semantic colors only for statuses |
 | Starting jobs | CLI only in v0 (`fixer run ...`); the UI shows them live |
 | GitHub token | Managed on the Providers & keys page, stored in the same encrypted vault |
 
-## 2. Layout
+## 2. Home page (`/`)
+
+A minimal landing page with its own top nav (no sidebar):
+
+1. **Hero:** "Bugs in. Pull requests out." with a staggered blur-in, the run command (click to copy), and an **animated agent-run card** that loops through the pipeline: steps check off, the first fix attempt fails, the second passes, and the status flips to "PR opened".
+2. **Live strip:** jobs today, success rate, requests today and active provider from the same live store as the dashboard, with count-up numbers.
+3. **How it works:** the four stages (Prepare, Understand, Fix, Ship) revealed on scroll, with a line drawing across.
+4. **Features:** reproduce first, free models with failover, locked keys, guardrails.
+5. **Call to action** to set up providers, then a footer.
+
+## 2b. Dashboard layout
 
 ```
 ┌────────────┬───────────────────────────────────────────────────────────┐
@@ -135,7 +147,7 @@
 
 ## 5. Theme and style
 - shadcn/ui defaults with a neutral palette and one accent color, plus semantic colors for statuses: green = success/active, amber = rate-limited/paused, red = failed/invalid, blue = running.
-- `next-themes` handles system, light and dark, with the toggle in the header.
+- An inline script handles system, light and dark before first paint, with the toggle in the header (cycles system → light → dark).
 - Times shown relative ("2m ago"), with the full timestamp on hover. Monospace for repo names, key hints and paths.
 
 ## 6. What the backend needs to provide

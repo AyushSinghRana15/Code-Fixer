@@ -1,0 +1,244 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-brand: var(--brand);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --success: oklch(0.56 0.15 150);
+  --warning: oklch(0.62 0.14 70);
+  --info: oklch(0.55 0.17 255);
+  --brand: oklch(0.55 0.19 350);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --success: oklch(0.74 0.16 150);
+  --warning: oklch(0.8 0.14 80);
+  --info: oklch(0.72 0.14 250);
+  --brand: oklch(0.72 0.16 350);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+@layer utilities {
+  /* pulsing dot for running items */
+  @keyframes live-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+  .animate-live { animation: live-pulse 1.6s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-live { animation: none; }
+  }
+}
+
+/* ---------- Motion ----------
+   One easing curve everywhere keeps the motion consistent. */
+:root {
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* Hero entrance: fade up out of a soft blur, staggered by --i */
+@keyframes hero-in {
+  from { opacity: 0; transform: translateY(14px); filter: blur(8px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+.hero-in {
+  animation: hero-in 900ms var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 70ms + 80ms);
+}
+
+/* Scroll reveal: only elements below the fold get data-reveal="pending" (set by <Reveal>) */
+[data-reveal] > * {
+  transition: opacity 700ms var(--ease-out), transform 700ms var(--ease-out), filter 700ms var(--ease-out);
+  transition-delay: calc(var(--i, 0) * 80ms);
+}
+[data-reveal="pending"] > * { opacity: 0; transform: translateY(18px); filter: blur(4px); }
+
+/* A rule that draws itself in when its section is revealed */
+.draw-line { transform-origin: left; transition: transform 1200ms var(--ease-out) 150ms; }
+[data-reveal="pending"] .draw-line { transform: scaleX(0); }
+
+/* Soft background: dot grid fading out from the top, plus a slowly breathing accent glow */
+.bg-dots {
+  background-image: radial-gradient(color-mix(in oklch, var(--foreground) 13%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 30%, transparent 75%);
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.08); }
+}
+.glow {
+  background: radial-gradient(closest-side, color-mix(in oklch, var(--brand) 26%, transparent), transparent);
+  animation: breathe 9s ease-in-out infinite;
+}
+
+/* ---------- Route transitions (React <ViewTransition>, see Next.js "view transitions" guide) ---------- */
+::view-transition { pointer-events: none; }
+
+@keyframes vt-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes vt-slide { from { translate: var(--slide-offset); } to { translate: 0; } }
+@keyframes vt-rise { from { translate: 0 10px; } to { translate: 0 0; } }
+
+/* home → dashboard */
+::view-transition-old(.nav-forward) {
+  --slide-offset: -60px;
+  animation: 160ms ease-in both vt-fade reverse, 420ms var(--ease-out) both vt-slide reverse;
+}
+::view-transition-new(.nav-forward) {
+  --slide-offset: 60px;
+  animation: 240ms ease-out 140ms both vt-fade, 420ms var(--ease-out) both vt-slide;
+}
+/* dashboard → home */
+::view-transition-old(.nav-back) {
+  --slide-offset: 60px;
+  animation: 160ms ease-in both vt-fade reverse, 420ms var(--ease-out) both vt-slide reverse;
+}
+::view-transition-new(.nav-back) {
+  --slide-offset: -60px;
+  animation: 240ms ease-out 140ms both vt-fade, 420ms var(--ease-out) both vt-slide;
+}
+/* between dashboard pages: quick fade + small rise, the sidebar stays put */
+::view-transition-old(.nav-switch) { animation: 120ms ease-in both vt-fade reverse; }
+::view-transition-new(.nav-switch) { animation: 220ms ease-out 80ms both vt-fade, 320ms var(--ease-out) both vt-rise; }
+
+/* the logo morphs between the home nav and the sidebar */
+::view-transition-group(.morph) { animation-duration: 450ms; animation-timing-function: var(--ease-out); }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-in, .glow { animation: none; }
+  [data-reveal] > *, .draw-line { transition: none; }
+  [data-reveal="pending"] > * { opacity: 1; transform: none; filter: none; }
+  [data-reveal="pending"] .draw-line { transform: none; }
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}

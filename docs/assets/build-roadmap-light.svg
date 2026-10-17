@@ -2,9 +2,10 @@
 <rect x="1" y="1" width="858" height="850" rx="14" fill="#f6f8fa" stroke="#d0d7de"/>
 <text x="40" y="52" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="24" fill="#1f2328" font-weight="700" text-anchor="start" >Code Fixer — build roadmap</text>
 <text x="40" y="78" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#59636e" font-weight="normal" text-anchor="start" >10 engineering phases. Each one is a milestone.</text>
-<text x="820" y="40" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" fill="#bf3989" font-weight="600" text-anchor="end" >Next: 01 · Frontend</text>
-<text x="560" y="66" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" fill="#1f2328" font-weight="700" text-anchor="start" >Done 0 / 10 phases</text>
+<text x="820" y="40" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" fill="#bf3989" font-weight="600" text-anchor="end" >Next: 02 · Backend</text>
+<text x="560" y="66" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" fill="#1f2328" font-weight="700" text-anchor="start" >Done 1 / 10 phases</text>
 <rect x="560" y="76" width="260" height="8" rx="4" fill="#eaeef2"/>
+<rect x="560" y="76" width="26.0" height="8" rx="4" fill="#1a7f37"/>
 <rect x="40.0" y="124" width="200" height="34" rx="17" fill="#1a7f37" opacity="0.15"/>
 <rect x="40.0" y="124" width="200" height="34" rx="17" fill="none" stroke="#1a7f37" stroke-width="1.5"/>
 <text x="140.0" y="146" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#1a7f37" font-weight="700" text-anchor="middle" >★ Production-ready agent</text>
@@ -12,24 +13,24 @@
 <line x1="170" y1="168" x2="170" y2="754" stroke="#8c959f" stroke-width="6" stroke-linecap="round"/>
 <line x1="110" y1="722" x2="170" y2="722" stroke="#8c959f" stroke-width="6" stroke-linecap="round"/>
 <line x1="170" y1="722" x2="200" y2="722" stroke="#8c959f" stroke-width="1.5"/>
-<circle cx="140.0" cy="722" r="15" fill="none" stroke="#bf3989" stroke-width="2"><animate attributeName="r" values="15;24;15" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.9;0;0.9" dur="2s" repeatCount="indefinite"/></circle>
-<circle cx="140.0" cy="722" r="15" fill="#ffffff" stroke="#bf3989" stroke-width="2"/>
-<text x="140.0" y="726.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5" fill="#bf3989" font-weight="700" text-anchor="middle" >01</text>
-<rect x="200" y="699.0" width="620" height="46" rx="10" fill="#ffffff" stroke="#bf3989"/>
+<circle cx="140.0" cy="722" r="15" fill="#1a7f37" stroke="#1a7f37" stroke-width="2"/>
+<text x="140.0" y="726.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5" fill="#ffffff" font-weight="700" text-anchor="middle" >01</text>
+<rect x="200" y="699.0" width="620" height="46" rx="10" fill="#ffffff" stroke="#d0d7de"/>
 <text x="218" y="719" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328" font-weight="700" text-anchor="start" >Frontend</text>
 <text x="218" y="736" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" fill="#59636e" font-weight="normal" text-anchor="start" >Next.js dashboard: jobs, providers &amp; keys</text>
-<rect x="710" y="711" width="96" height="22" rx="11" fill="none" fill-opacity="1" stroke="#bf3989" stroke-width="1.2"/>
-<text x="758.0" y="726" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#bf3989" font-weight="600" text-anchor="middle" >▶ next</text>
+<rect x="710" y="711" width="96" height="22" rx="11" fill="#1a7f37" fill-opacity="0.15" stroke="#1a7f37" stroke-width="1.2"/>
+<text x="758.0" y="726" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#1a7f37" font-weight="600" text-anchor="middle" >✓ done</text>
 <rect x="200" y="699.0" width="620" height="46" rx="10" fill="#bf3989" fill-opacity="0.07" stroke="#bf3989" stroke-width="2" opacity="0"><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="linear" keyTimes="0.0000;0.0280;0.0400;0.0900;0.9700;1.0000" values="0.0;0.0;1.0;0.3;0.3;0.0"/></rect>
 <line x1="110" y1="664" x2="170" y2="664" stroke="#8c959f" stroke-width="6" stroke-linecap="round"/>
 <line x1="170" y1="664" x2="200" y2="664" stroke="#8c959f" stroke-width="1.5"/>
-<circle cx="140.0" cy="664" r="15" fill="#ffffff" stroke="#8c959f" stroke-width="2"/>
-<text x="140.0" y="668.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5" fill="#8c959f" font-weight="700" text-anchor="middle" >02</text>
-<rect x="200" y="641.0" width="620" height="46" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+<circle cx="140.0" cy="664" r="15" fill="none" stroke="#bf3989" stroke-width="2"><animate attributeName="r" values="15;24;15" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.9;0;0.9" dur="2s" repeatCount="indefinite"/></circle>
+<circle cx="140.0" cy="664" r="15" fill="#ffffff" stroke="#bf3989" stroke-width="2"/>
+<text x="140.0" y="668.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5" fill="#bf3989" font-weight="700" text-anchor="middle" >02</text>
+<rect x="200" y="641.0" width="620" height="46" rx="10" fill="#ffffff" stroke="#bf3989"/>
 <text x="218" y="661" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328" font-weight="700" text-anchor="start" >Backend</text>
 <text x="218" y="678" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" fill="#59636e" font-weight="normal" text-anchor="start" >FastAPI, live events, encrypted key vault</text>
-<rect x="710" y="653" width="96" height="22" rx="11" fill="none" fill-opacity="1" stroke="#8c959f" stroke-width="1.2"/>
-<text x="758.0" y="668" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#8c959f" font-weight="600" text-anchor="middle" >○ planned</text>
+<rect x="710" y="653" width="96" height="22" rx="11" fill="none" fill-opacity="1" stroke="#bf3989" stroke-width="1.2"/>
+<text x="758.0" y="668" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#bf3989" font-weight="600" text-anchor="middle" >▶ next</text>
 <rect x="200" y="641.0" width="620" height="46" rx="10" fill="#bf3989" fill-opacity="0.07" stroke="#bf3989" stroke-width="2" opacity="0"><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="linear" keyTimes="0.0000;0.1191;0.1311;0.1811;0.9700;1.0000" values="0.0;0.0;1.0;0.3;0.3;0.0"/></rect>
 <line x1="110" y1="606" x2="170" y2="606" stroke="#8c959f" stroke-width="6" stroke-linecap="round"/>
 <line x1="170" y1="606" x2="200" y2="606" stroke="#8c959f" stroke-width="1.5"/>

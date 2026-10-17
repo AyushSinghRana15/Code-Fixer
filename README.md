@@ -2,7 +2,7 @@
 
 An autonomous agent that connects to GitHub repos, reproduces reported bugs in a sandbox, fixes them, runs the tests until they pass, and opens a pull request explaining the fix. It's designed to run **nearly free** on free-tier LLM providers.
 
-> **Status:** planning is done; phase 01 (Frontend) is next. Nothing is runnable yet. See [Plan.md](Plan.md) for the full design and decisions.
+> **Status:** phase 01 (Frontend) is done: the dashboard runs on mock data (`cd frontend && npm install && npm run dev`). Phase 02 (Backend) is next. See [Plan.md](Plan.md) for the full design and decisions.
 
 ## Build roadmap
 
