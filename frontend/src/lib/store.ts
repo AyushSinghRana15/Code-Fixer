@@ -82,14 +82,24 @@ function apply(e: SseEvent) {
 
 let started = false;
 
+function load() {
+  Promise.all([api.listJobs(), api.getStats(), api.listProviders(), api.getGithub()])
+    .then(([jobs, stats, providers, github]) => set({ jobs, stats, providers, github, loadError: null }))
+    .catch((err: unknown) => {
+      set({ loadError: err instanceof Error ? err.message : String(err) });
+      setTimeout(load, 4000); // keep trying: the dashboard recovers as soon as the backend starts
+    });
+}
+
 /** Load initial data and open the event stream. Safe to call many times. */
 export function ensureStarted() {
   if (started) return;
   started = true;
-  connectEvents(apply, (stream) => set({ stream }));
-  Promise.all([api.listJobs(), api.getStats(), api.listProviders(), api.getGithub()])
-    .then(([jobs, stats, providers, github]) => set({ jobs, stats, providers, github }))
-    .catch((err: unknown) => set({ loadError: err instanceof Error ? err.message : String(err) }));
+  connectEvents(apply, (stream) => {
+    set({ stream });
+    if (stream === "live" && state.loadError) load(); // backend came back: reload everything
+  });
+  load();
 }
 
 // ---- mutations: each returns the server's new state and stores it ----

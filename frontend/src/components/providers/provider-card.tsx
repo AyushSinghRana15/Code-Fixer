@@ -99,6 +99,7 @@ export function ProviderCard({
     }
   }
 
+  const fromEnv = provider.source === "env";
   const retry =
     provider.retryAt && now ? ` · retries ${relativeTime(provider.retryAt, now)} (${clockTime(provider.retryAt)})` : "";
 
@@ -110,7 +111,7 @@ export function ProviderCard({
             variant="ghost"
             size="icon-xs"
             aria-label={`Move ${provider.label} up`}
-            disabled={index === 0}
+            disabled={index === 0 || fromEnv}
             onClick={() => actions.move(provider.id, -1)}
           >
             <ArrowUpIcon />
@@ -120,7 +121,7 @@ export function ProviderCard({
             variant="ghost"
             size="icon-xs"
             aria-label={`Move ${provider.label} down`}
-            disabled={index === count - 1}
+            disabled={index === count - 1 || fromEnv}
             onClick={() => actions.move(provider.id, 1)}
           >
             <ArrowDownIcon />
@@ -134,6 +135,14 @@ export function ProviderCard({
             <StatusPill tone={st.tone}>{st.label}</StatusPill>
             {index === 0 && !disabled && (
               <span className="rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground">primary</span>
+            )}
+            {fromEnv && (
+              <span
+                className="rounded-full border border-dashed px-2 py-0.5 text-[11px] text-muted-foreground"
+                title="This key comes from backend/.env. Edit it there, or add the provider here to keep its key in the encrypted vault."
+              >
+                from .env
+              </span>
             )}
             {provider.trainsOnData && (
               <span className="inline-flex items-center gap-1 rounded-full bg-warning/14 px-2 py-0.5 text-[11px] text-warning">
@@ -168,7 +177,7 @@ export function ProviderCard({
         <Button variant="outline" size="sm" onClick={test} disabled={testing}>
           {testing ? <Loader2Icon className="animate-spin" /> : <PlugZapIcon />} Test
         </Button>
-        {preset.needsKey && (
+        {preset.needsKey && !fromEnv && (
           <SecretDialog
             trigger={<Button variant="outline" size="sm" />}
             triggerContent={
@@ -188,6 +197,7 @@ export function ProviderCard({
             }}
           />
         )}
+        {!fromEnv && (
         <Button
           variant="outline"
           size="sm"
@@ -201,6 +211,7 @@ export function ProviderCard({
         >
           <PowerIcon /> {disabled ? "Enable" : "Disable"}
         </Button>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger
             render={<Button variant="ghost" size="icon-sm" aria-label={`More actions for ${provider.label}`} />}
@@ -213,10 +224,14 @@ export function ProviderCard({
                 <ExternalLinkIcon /> Open key settings
               </DropdownMenuItem>
             )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" onClick={() => setRemoveOpen(true)}>
-              <Trash2Icon /> Remove…
-            </DropdownMenuItem>
+            {!fromEnv && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem variant="destructive" onClick={() => setRemoveOpen(true)}>
+                  <Trash2Icon /> Remove…
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 

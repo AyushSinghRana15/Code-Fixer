@@ -2,7 +2,7 @@
 
 An autonomous agent that connects to GitHub repos, reproduces reported bugs in a sandbox, fixes them, runs the tests until they pass, and opens a pull request explaining the fix. It's designed to run **nearly free** on free-tier LLM providers.
 
-> **Status:** the agent fixes GitHub issues end to end from the CLI and opens pull requests (phase 03, Orchestration, is in progress: the Docker sandbox is next). The dashboard (phase 01) runs on mock data. See [Plan.md](Plan.md) for the full design.
+> **Status:** the agent fixes GitHub issues end to end and opens pull requests; the dashboard shows every job live and manages providers and keys through the encrypted vault (phases 01–02 done; phase 03 has only the Docker sandbox left). See [Plan.md](Plan.md) for the full design.
 
 ## Quick start
 
@@ -14,6 +14,15 @@ uv run fixer providers test   # checks each key and that tool calling works
 uv run fixer run --repo evals/bugs/py_cart --issue-file evals/bugs/py_cart/ISSUE.md   # a local repo
 uv run fixer fix https://github.com/owner/repo/issues/12                            # a GitHub issue
 ```
+
+To use the dashboard, run the API and the frontend side by side:
+
+```bash
+cd backend && uv run fixer serve          # API on 127.0.0.1:8000 (localhost only)
+cd frontend && npm install && npm run dev # dashboard on http://localhost:3000
+```
+
+Jobs started from the CLI appear in the dashboard live (they share `~/.fixer/fixer.db`).
 
 `fixer run` works on a private copy of a local repo and never edits yours; it prints the verified diff and saves a patch (`--apply` applies it). `fixer fix` reads the issue, clones the repo, and once the fix is verified pushes a branch (to your fork if you can't push to the repo) and opens a **draft** PR with the root cause, the reproduction test and before/after test results. It uses `FIXER_GITHUB_TOKEN`, `GITHUB_TOKEN` or your `gh` login.
 
@@ -137,13 +146,20 @@ deploy/              Docker, compose, CI
 
 ## Providers and keys
 
-Today, keys come from `backend/.env` (git-ignored); the encrypted vault and `add`/`rotate-key` commands arrive with the backend (phase 02).
+Keys live in an **encrypted vault** (AES-256-GCM in `~/.fixer/fixer.db`, master key in your OS keychain, or derived from `FIXER_VAULT_PASSPHRASE` on headless machines). Add them in the dashboard (**Providers & keys**) or from the CLI; keys are typed into hidden prompts, checked live, and never shown again, only a masked hint. Keys in `backend/.env` still work and take priority; they show as "from .env".
 
 ```bash
-uv run fixer providers list    # providers with a key, fallback order, masked keys
-uv run fixer providers test    # live check: key valid, model reachable, tool calling works
-uv run fixer doctor            # git, ripgrep, uv, docker, keys
+uv run fixer providers add openrouter   # hidden prompt → live check → stored encrypted
+uv run fixer providers list             # order, source, masked keys, state, today's usage
+uv run fixer providers order groq openrouter
+uv run fixer providers rotate-key openrouter
+uv run fixer providers import-env       # move keys from backend/.env into the vault
+uv run fixer providers test             # live check: key valid, model reachable, tool calling works
+uv run fixer github set-token           # or just use your `gh auth login`
+uv run fixer doctor                     # git, ripgrep, uv, docker, keys
 ```
+
+Provider state is remembered across runs: when a provider's daily quota runs out, jobs skip it until it resets instead of spending requests rediscovering it.
 
 Free tiers to know about: OpenRouter allows 50 free requests/day (1,000/day after a one-time $10 top-up); Groq's free tier caps tokens per minute, so the router paces requests and waits out short limits automatically.
 

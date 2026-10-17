@@ -13,15 +13,17 @@ npm run dev
 
 Open http://localhost:3000 for the home page; the dashboard is at `/jobs`.
 
-## Mock vs live data
+## Live vs mock data
 
-v0 runs entirely on an **in-browser mock backend** (`src/lib/api/mock-backend.ts`). It simulates a running job moving through the pipeline, request usage and provider recovery, and emits the same events the real SSE stream will.
+The dashboard talks to the FastAPI backend: start it with `cd backend && uv run fixer serve` (port 8000). If the backend isn't running, the pages say so and reconnect on their own once it starts.
 
-To use the real FastAPI backend instead, once it exists (roadmap phase 02):
+To work on the UI without a backend, use the in-browser mock (`src/lib/api/mock-backend.ts`), which simulates jobs, usage and provider recovery and emits the same events:
 
 ```bash
-NEXT_PUBLIC_API_MODE=live BACKEND_URL=http://127.0.0.1:8000 npm run dev
+NEXT_PUBLIC_API_MODE=mock npm run dev
 ```
+
+`BACKEND_URL` changes where `/api/*` is proxied (default `http://127.0.0.1:8000`).
 
 `/api/*` is proxied to the backend by `next.config.ts`, so the browser only ever talks to one origin.
 

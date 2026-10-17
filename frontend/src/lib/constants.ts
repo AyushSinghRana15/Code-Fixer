@@ -4,6 +4,7 @@ export const PHASES: { key: PhaseKey; label: string }[] = [
   { key: "intake", label: "Intake" },
   { key: "env", label: "Env" },
   { key: "baseline", label: "Baseline" },
+  { key: "context", label: "Context" },
   { key: "reproduce", label: "Reproduce" },
   { key: "localize", label: "Localize" },
   { key: "fix", label: "Fix loop" },
@@ -23,6 +24,8 @@ export type Tone = "success" | "warning" | "danger" | "info" | "muted";
 export const JOB_STATUS: Record<JobStatus, { label: string; tone: Tone }> = {
   queued: { label: "Queued", tone: "muted" },
   running: { label: "Running", tone: "info" },
+  fixed: { label: "Fixed", tone: "success" },
+  needs_review: { label: "Needs review", tone: "warning" },
   paused: { label: "Paused", tone: "warning" },
   pr_opened: { label: "PR opened", tone: "success" },
   failed: { label: "Failed", tone: "danger" },

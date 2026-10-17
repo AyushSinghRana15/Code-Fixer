@@ -26,6 +26,10 @@ class ProviderSpec:
     rpm: int | None = None  # requests/minute on the free tier; the router paces to stay under it
     trains_on_data: bool = False  # never used for private repos
     needs_key: bool = True
+    key_prefix: str | None = None  # for validation and masked hints
+    key_url: str | None = None  # where to get a key
+    daily_limit: int | None = None  # free-tier requests/day, when known
+    note: str = ""
 
 
 _OR_FIX = (
@@ -48,6 +52,11 @@ CATALOG: dict[str, ProviderSpec] = {
             "scout": ("google/gemma-4-26b-a4b-it:free", "nvidia/nemotron-3-super-120b-a12b:free"),
         },
         rpm=20,
+        key_prefix="sk-or-",
+        key_url="https://openrouter.ai/keys",
+        daily_limit=int(os.environ.get("FIXER_OPENROUTER_DAILY_LIMIT", "50")),
+        note="Many free models behind one key. 50 free requests/day; 1,000/day after a one-time $10 top-up "
+        "(set FIXER_OPENROUTER_DAILY_LIMIT=1000).",
     ),
     "nvidia": ProviderSpec(
         id="nvidia",
@@ -60,6 +69,9 @@ CATALOG: dict[str, ProviderSpec] = {
             "summarize": ("deepseek-ai/deepseek-v4-flash",),
         },
         rpm=40,
+        key_prefix="nvapi-",
+        key_url="https://build.nvidia.com",
+        note="DeepSeek, Kimi and Nemotron models. Free for prototyping and testing.",
     ),
     "groq": ProviderSpec(
         id="groq",
@@ -73,6 +85,10 @@ CATALOG: dict[str, ProviderSpec] = {
             "scout": ("openai/gpt-oss-20b", "openai/gpt-oss-120b"),
         },
         rpm=30,
+        key_prefix="gsk_",
+        key_url="https://console.groq.com/keys",
+        daily_limit=1000,
+        note="Very fast. Free tier caps tokens per minute, so the router paces requests.",
     ),
     "gemini": ProviderSpec(
         id="gemini",
@@ -86,6 +102,10 @@ CATALOG: dict[str, ProviderSpec] = {
         },  # check
         rpm=10,
         trains_on_data=True,
+        key_prefix="AIza",
+        key_url="https://aistudio.google.com/apikey",
+        daily_limit=1500,
+        note="Gemini Flash models. The free tier trains on prompts, so it's only used for public repos.",
     ),
     "mistral": ProviderSpec(
         id="mistral",
@@ -98,6 +118,8 @@ CATALOG: dict[str, ProviderSpec] = {
             "summarize": ("mistral-small-latest",),
         },
         trains_on_data=True,
+        key_url="https://console.mistral.ai/api-keys",
+        note="About $10/month of free credits. Trains on data unless you opt out.",
     ),
     "ollama": ProviderSpec(
         id="ollama",
@@ -106,6 +128,30 @@ CATALOG: dict[str, ProviderSpec] = {
         key_envs=(),
         models={"fix": ("qwen3:8b",), "critic": ("qwen3:8b",), "summarize": ("qwen3:4b",)},
         needs_key=False,
+        note="Runs on your machine, no key and no limits. Small models only on 16 GB of RAM.",
+    ),
+    "anthropic": ProviderSpec(
+        id="anthropic",
+        name="Anthropic (paid)",
+        base_url="https://api.anthropic.com/v1/",
+        key_envs=("FIXER_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"),
+        models={
+            "fix": ("claude-opus-5-5",),
+            "critic": ("claude-sonnet-5-5",),
+            "summarize": ("claude-haiku-4-5",),
+            "scout": ("claude-haiku-4-5",),
+        },
+        key_prefix="sk-ant-",
+        key_url="https://console.anthropic.com",
+        note="Optional paid escalation for bugs the free models can't solve.",
+    ),
+    "custom": ProviderSpec(
+        id="custom",
+        name="Custom (OpenAI-compatible)",
+        base_url="",
+        key_envs=(),
+        models={},
+        note="Any service with an OpenAI-compatible API. Bring the base URL and model names.",
     ),
 }
 

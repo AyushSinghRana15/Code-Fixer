@@ -182,6 +182,18 @@ class Job:
     # ---- run ----
     def run(self) -> JobResult:
         self.job_dir.mkdir(parents=True, exist_ok=True)
+        gh = self.cfg.github
+        first_line = next((ln.strip("# ").strip() for ln in self.cfg.issue.splitlines() if ln.strip()), "")
+        self.emit(
+            "job.started",
+            repo=gh.target.ref.slug if gh else Path(self.cfg.repo).resolve().name,
+            issue_number=gh.target.ref.number if gh else 0,
+            issue_title=(gh.target.title if gh else first_line)[:200],
+            issue_url=gh.target.issue_url if gh else "",
+            request_budget=self.cfg.budget.max_requests,
+            phases=self.phases,
+            job_dir=str(self.job_dir),
+        )
         current = "intake"
         try:
             for current in self.phases:
@@ -206,7 +218,14 @@ class Job:
                 self.result.diff = self.ws.diff()
             self._report_failure()
             (self.job_dir / "result.json").write_text(json.dumps(asdict(self.result), indent=2, default=str))
-            self.emit("job.finished", status=self.result.status, reason=self.result.reason)
+            self.emit(
+                "job.finished",
+                status=self.result.status,
+                reason=self.result.reason,
+                tests=self.result.tests,
+                repro_test=self.result.repro_test,
+                pr_url=self.result.pr_url,
+            )
         return self.result
 
     # ---- deterministic phases ----

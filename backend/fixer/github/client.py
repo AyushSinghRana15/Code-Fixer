@@ -17,8 +17,8 @@ from typing import Any
 
 API = "https://api.github.com"
 
-# (method, url, json body, headers) -> (status, parsed json)
-Transport = Callable[[str, str, Any, dict[str, str]], tuple[int, Any]]
+# (method, url, json body, headers) -> (status, parsed json) or (status, parsed json, response headers)
+Transport = Callable[[str, str, Any, dict[str, str]], tuple]
 
 
 class GitHubError(Exception):
@@ -55,16 +55,25 @@ def parse_issue_ref(text: str) -> IssueRef:
     return IssueRef(owner, repo.removesuffix(".git"), int(num))
 
 
-def find_token() -> str | None:
-    """FIXER_GITHUB_TOKEN, then GITHUB_TOKEN, then the GitHub CLI's login (`gh auth token`)."""
+def find_token(vault: Any = None) -> str | None:
+    """FIXER_GITHUB_TOKEN / GITHUB_TOKEN, then the vault, then the GitHub CLI's login (`gh auth token`)."""
+    return token_source(vault)[0]
+
+
+def token_source(vault: Any = None) -> tuple[str | None, str]:
+    """(token, where it came from: env | vault | gh | none)."""
     for name in ("FIXER_GITHUB_TOKEN", "GITHUB_TOKEN", "GH_TOKEN"):
         if os.environ.get(name, "").strip():
-            return os.environ[name].strip()
+            return os.environ[name].strip(), "env"
+    if vault is not None:
+        stored = vault.get_secret("github")
+        if stored:
+            return stored, "vault"
     if shutil.which("gh"):
         res = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True)
         if res.returncode == 0 and res.stdout.strip():
-            return res.stdout.strip()
-    return None
+            return res.stdout.strip(), "gh"
+    return None, "none"
 
 
 def _ssl_context() -> ssl.SSLContext:
@@ -87,14 +96,14 @@ def _urllib_transport(method: str, url: str, body: Any, headers: dict[str, str])
     try:
         with urllib.request.urlopen(req, timeout=30, context=_SSL) as resp:
             raw = resp.read()
-            return resp.status, json.loads(raw) if raw else None
+            return resp.status, json.loads(raw) if raw else None, dict(resp.headers)
     except urllib.error.HTTPError as err:
         raw = err.read()
         try:
             payload = json.loads(raw) if raw else None
         except json.JSONDecodeError:
             payload = {"message": raw.decode(errors="replace")[:300]}
-        return err.code, payload
+        return err.code, payload, dict(err.headers or {})
     except urllib.error.URLError as err:
         raise GitHubError(f"couldn't reach GitHub: {err.reason}") from err
 
@@ -103,6 +112,7 @@ class GitHubClient:
     def __init__(self, token: str | None, transport: Transport | None = None):
         self.token = token
         self._transport = transport or _urllib_transport
+        self.last_headers: dict[str, str] = {}
 
     def _call(self, method: str, path: str, body: Any = None, ok: tuple[int, ...] = (200, 201, 202)) -> Any:
         headers = {
@@ -114,7 +124,9 @@ class GitHubClient:
             headers["Authorization"] = f"Bearer {self.token}"
         if body is not None:
             headers["Content-Type"] = "application/json"
-        status, payload = self._transport(method, f"{API}{path}", body, headers)
+        out = self._transport(method, f"{API}{path}", body, headers)
+        status, payload = out[0], out[1]
+        self.last_headers = {k.lower(): v for k, v in (out[2] if len(out) > 2 else {}).items()}
         if status not in ok:
             msg = (payload or {}).get("message", "") if isinstance(payload, dict) else str(payload)
             errors = (payload or {}).get("errors") if isinstance(payload, dict) else None
@@ -130,6 +142,12 @@ class GitHubClient:
     # ---- reads ----
     def user(self) -> dict[str, Any]:
         return self._call("GET", "/user")
+
+    def token_info(self) -> tuple[str, list[str]]:
+        """(login, OAuth scopes). Fine-grained tokens report no scopes header, so scopes may be empty."""
+        login = self.user()["login"]
+        scopes = [s.strip() for s in self.last_headers.get("x-oauth-scopes", "").split(",") if s.strip()]
+        return login, scopes
 
     def repo(self, owner: str, repo: str) -> dict[str, Any]:
         return self._call("GET", f"/repos/{owner}/{repo}")

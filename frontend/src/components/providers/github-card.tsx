@@ -40,6 +40,14 @@ export function GithubCard({ github, now }: { github: GithubCredential | null; n
         </p>
       ) : (
         <dl className="grid gap-x-6 gap-y-1 text-xs sm:grid-cols-[auto_1fr]">
+          <dt className="text-muted-foreground">Source</dt>
+          <dd>
+            {github.source === "gh"
+              ? "your GitHub CLI login (gh auth)"
+              : github.source === "env"
+                ? "an environment variable"
+                : "encrypted vault"}
+          </dd>
           <dt className="text-muted-foreground">Token</dt>
           <dd className="font-mono">{github.keyHint}</dd>
           <dt className="text-muted-foreground">Account</dt>
@@ -66,7 +74,7 @@ export function GithubCard({ github, now }: { github: GithubCredential | null; n
           trigger={<Button variant={missing ? "default" : "outline"} size="sm" />}
           triggerContent={
             <>
-              <KeyRoundIcon /> {missing ? "Add token" : "Rotate"}
+              <KeyRoundIcon /> {missing ? "Add token" : github.source === "vault" ? "Rotate" : "Store a token here"}
             </>
           }
           title={missing ? "Add GitHub token" : "Rotate GitHub token"}
@@ -99,6 +107,7 @@ export function GithubCard({ github, now }: { github: GithubCredential | null; n
             >
               {testing ? <Loader2Icon className="animate-spin" /> : <PlugZapIcon />} Test
             </Button>
+            {github.source === "vault" && (
             <ConfirmDialog
               trigger={<Button variant="ghost" size="sm" className="text-destructive" />}
               triggerContent={
@@ -114,6 +123,7 @@ export function GithubCard({ github, now }: { github: GithubCredential | null; n
                 toast.success("GitHub token removed");
               }}
             />
+            )}
           </>
         )}
       </div>

@@ -49,7 +49,7 @@ export function StatCards({ stats, providers }: { stats: StatsSummary | null; pr
       <Stat
         label="Success rate · 7 days"
         value={stats.successRate7d === null ? "—" : pct(stats.successRate7d)}
-        sub={`${stats.succeeded7d} of ${stats.finished7d} finished jobs opened a PR`}
+        sub={`${stats.succeeded7d} of ${stats.finished7d} finished jobs were fixed`}
       />
       <Stat
         label="LLM requests today"

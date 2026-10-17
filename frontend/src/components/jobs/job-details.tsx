@@ -80,9 +80,11 @@ export function JobDetails({ job, providerLabel }: { job: Job; providerLabel: (i
       <Row label="Tests">{tests(job)}</Row>
       <Row label="Links">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          <a href={job.issueUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline-offset-4 hover:underline">
-            Issue #{job.issueNumber} <ExternalLinkIcon className="size-3.5" />
-          </a>
+          {job.issueUrl && (
+            <a href={job.issueUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline-offset-4 hover:underline">
+              Issue #{job.issueNumber} <ExternalLinkIcon className="size-3.5" />
+            </a>
+          )}
           {job.prUrl && (
             <a href={job.prUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline-offset-4 hover:underline">
               Pull request <ExternalLinkIcon className="size-3.5" />

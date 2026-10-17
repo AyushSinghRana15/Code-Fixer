@@ -301,7 +301,7 @@ Each phase is one milestone, built in this order. Tests are written alongside ev
 |---|---|---|---|
 | 00 | ✅ Planning | Plan.md, frontend design, repo layout, GitHub repo | Done |
 | 01 | ✅ **Frontend** | Next.js v0: Jobs dashboard and Providers & keys pages on mock data ([docs/frontend.md](docs/frontend.md)) | Both pages work on mock data, with theme toggle and a mock live stream |
-| 02 | **Backend** | FastAPI REST + SSE, SQLite job store, encrypted key vault, `fixer providers` CLI; frontend wired to the live API | A key added in the UI is stored encrypted and passes its live test |
+| 02 | ✅ **Backend** | FastAPI REST + SSE, SQLite job store, encrypted key vault, `fixer providers` CLI; frontend wired to the live API | A key added in the UI is stored encrypted and passes its live test |
 | 03 | 🔨 **Orchestration** | Free-LLM router with failover, agent loop and tools, Docker sandbox, env detection, the pipeline state machine (§4), budgets, PR creation | Fixes a planted bug in a toy Python repo and opens a PR |
 | 04 | **Memory & Retrieval** | Code search and symbol index (tree-sitter), localization ranking, repo memory, retrieval of similar past fixes | Localization accuracy measured on the eval set |
 | 05 | **Observability** | Trajectory store, traces (OpenTelemetry → Langfuse or Arize Phoenix, both free to self-host), metrics, job replay in the dashboard | Every job can be traced end to end |

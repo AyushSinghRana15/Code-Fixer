@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import shutil
-import time
 from pathlib import Path
 from typing import Annotated
 
@@ -15,13 +14,13 @@ from rich.syntax import Syntax
 from rich.table import Table
 
 from fixer.config import Budget, load_env
-from fixer.events import Event, EventBus
-from fixer.llm.client import OpenAICompatProvider, ProviderError
-from fixer.llm.providers import CATALOG, configured, mask, models_for
-from fixer.llm.router import LLMRouter
+from fixer.events import Event
+from fixer.llm.providers import CATALOG
 
 app = typer.Typer(no_args_is_help=True, add_completion=False, help="Code Fixer: reproduce, fix and verify bugs.")
-providers_app = typer.Typer(no_args_is_help=True, help="LLM providers configured through environment variables.")
+providers_app = typer.Typer(no_args_is_help=True, help="LLM providers and their keys (encrypted vault + .env).")
+github_app = typer.Typer(no_args_is_help=True, help="GitHub token used by `fixer fix`.")
+app.add_typer(github_app, name="github")
 app.add_typer(providers_app, name="providers")
 console = Console(highlight=False, emoji=False)
 
@@ -117,14 +116,20 @@ class Renderer:
             console.print(f"  [dim]note: {d['text']}[/]")
 
 
-def build_router(max_requests: int, private: bool, bus: EventBus, only: str | None = None) -> LLMRouter:
-    providers = [OpenAICompatProvider(spec, key) for spec, key in configured() if not only or spec.id == only]
-    if not providers:
-        console.print("[red]No LLM provider configured.[/] Add a key to backend/.env, e.g. FIXER_OPENROUTER_API_KEY=…")
-        raise typer.Exit(2)
-    return LLMRouter(
-        providers, private_repo=private, max_requests=max_requests, on_event=lambda type, **data: bus.emit(type, **data)
-    )
+def _db():
+    from fixer.store.db import Database
+
+    return Database()
+
+
+def _vault(db):
+    from fixer.vault.vault import Vault, VaultLocked
+
+    try:
+        return Vault.open(db)
+    except VaultLocked as err:
+        console.print(f"[red]Vault locked:[/] {err}")
+        raise typer.Exit(2) from err
 
 
 # Options shared by `run` (local repo) and `fix` (GitHub issue)
@@ -157,17 +162,15 @@ def _execute(
     extra_secrets: list[str] | None = None,
     **job_kwargs,
 ) -> None:
-    """Build the router and job, stream events to the terminal, then print the result."""
-    from fixer.config import fixer_home
-    from fixer.orchestrator.pipeline import Job, JobConfig
-    from fixer.store.trajectory import TrajectoryLog
+    """Build the job (vault + env providers, recorded in the dashboard's database), stream events to the
+    terminal, then print the result."""
+    from fixer.orchestrator.pipeline import JobConfig
+    from fixer.runner import NoProviders, make_job
 
     kind = job_kwargs.pop("sandbox") or os.environ.get("FIXER_SANDBOX", "local")
     if kind == "local":
         console.print("[dim]Sandbox: local (no isolation; only use on repos you trust).[/]")
-    bus = EventBus(Renderer(verbose))
-    router = build_router(max_requests, private=private, bus=bus, only=provider)
-    candidates = job_kwargs.pop("candidates") or min(2, len(router.providers))
+    candidates = job_kwargs.pop("candidates")
     max_minutes = job_kwargs.pop("max_minutes")
     cfg = JobConfig(
         sandbox=kind,
@@ -175,16 +178,20 @@ def _execute(
         candidates=candidates,
         **job_kwargs,
     )
-    secrets = [k for _, k in configured() if k] + (extra_secrets or [])
-    log = TrajectoryLog(fixer_home() / "runs" / cfg.job_id / "events.jsonl", secrets)
-    bus.add(log)
+    try:
+        job, router, log = make_job(
+            cfg, db=_db(), private=private, only=provider, sinks=[Renderer(verbose)], extra_secrets=extra_secrets
+        )
+    except NoProviders as err:
+        console.print(f"[red]{err}[/]")
+        raise typer.Exit(2) from err
     console.print(
         f"[bold]Job {cfg.job_id}[/] · {repo_label} · providers: "
         + ", ".join(p.spec.id for p in router.providers)
         + f" · scouts: {cfg.scouts} · fixers: {cfg.candidates} (stagger {cfg.stagger})"
         + (" · private repo" if private else "")
     )
-    result = Job(cfg, router, bus).run()
+    result = job.run()
     log.close()
 
     color = {"fixed": "green", "needs_review": "yellow", "paused": "yellow"}.get(result.status, "red")
@@ -295,7 +302,10 @@ def fix(
 
     try:
         ref = parse_issue_ref(issue)
-        token = find_token()
+        db = _db()
+        from fixer.llm.registry import open_vault
+
+        token = find_token(open_vault(db))
         if not token:
             console.print(
                 "[yellow]No GitHub token found (FIXER_GITHUB_TOKEN, GITHUB_TOKEN or `gh auth login`). "
@@ -337,62 +347,218 @@ def fix(
     )
 
 
+def _entries(decrypt: bool = False):
+    from fixer.llm.registry import load_entries, open_vault
+
+    db = _db()
+    return db, load_entries(db, open_vault(db), decrypt=decrypt)
+
+
 @providers_app.command("list")
 def providers_list() -> None:
-    """Show providers that have a key, in fallback order."""
+    """Providers in fallback order: vault entries first, then keys found in .env."""
     load_env()
-    table = Table("#", "provider", "key", "fix model", "rpm", "trains on data")
-    rows = configured()
-    for i, (spec, key) in enumerate(rows, 1):
+    from fixer.api.views import providers_view
+
+    db, entries = _entries()
+    table = Table("#", "id", "source", "key", "state", "fix model", "today", "trains on data")
+    for i, (e, p) in enumerate(zip(entries, providers_view(db, entries), strict=True), 1):
+        limit = p["usage"].get("dailyLimit")
         table.add_row(
             str(i),
-            spec.id,
-            mask(key),
-            models_for(spec, "fix")[0],
-            str(spec.rpm or "—"),
-            "yes" if spec.trains_on_data else "no",
+            e.id,
+            e.source,
+            e.key_hint or "—",
+            p["state"],
+            p["models"]["fix"],
+            f"{p['usage']['requestsToday']}" + (f"/{limit}" if limit else ""),
+            "yes" if e.spec.trains_on_data else "no",
         )
-    console.print(table if rows else "[yellow]No providers configured. Add keys to backend/.env.[/]")
+    console.print(table if entries else "[yellow]No providers yet: `fixer providers add openrouter`.[/]")
 
 
 @providers_app.command("test")
 def providers_test(provider: Annotated[str | None, typer.Argument()] = None) -> None:
     """Live check: key works, model answers, tool calling works. Uses 1 request per provider."""
     load_env()
-    tool = {
-        "type": "function",
-        "function": {
-            "name": "add",
-            "description": "Add two integers.",
-            "parameters": {
-                "type": "object",
-                "properties": {"a": {"type": "integer"}, "b": {"type": "integer"}},
-                "required": ["a", "b"],
-            },
-        },
-    }
-    msgs = [{"role": "user", "content": "Use the add tool to add 2 and 3."}]
-    for spec, key in configured():
-        if provider and spec.id != provider:
+    from fixer.llm.check import check_provider
+
+    _, entries = _entries(decrypt=True)
+    for e in entries:
+        if (provider and e.id != provider) or not e.usable:
             continue
-        client = OpenAICompatProvider(spec, key, timeout=60)
-        for model in models_for(spec, "fix"):
-            t0 = time.monotonic()
-            try:
-                msg = client.complete(model, msgs, [tool], max_tokens=200, temperature=0)
-            except ProviderError as err:
-                console.print(f"[red]✗[/] {spec.id} / {model}: {err.kind} – {str(err)[:160]}")
-                if err.kind in ("auth", "credits", "quota"):
-                    break
-                continue
-            ms = (time.monotonic() - t0) * 1000
-            tools_ok = any(c.name == "add" for c in msg.tool_calls)
-            mark = "[green]✓[/]" if tools_ok else "[yellow]~[/]"
-            console.print(
-                f"{mark} {spec.id} / {model}: {ms:.0f} ms, tool calling "
-                + ("works" if tools_ok else "NOT used (text only)")
-            )
-            break
+        r = check_provider(e.spec, e.key)
+        mark = "[green]✓[/]" if r.ok and r.toolCalling else ("[yellow]~[/]" if r.ok else "[red]✗[/]")
+        console.print(f"{mark} {e.id}: {r.message}")
+
+
+@providers_app.command("add")
+def providers_add(
+    preset: Annotated[str, typer.Argument(help=f"One of: {', '.join(CATALOG)}")],
+    label: Annotated[str | None, typer.Option(help="Display name.")] = None,
+    base_url: Annotated[str | None, typer.Option(help="For custom/ollama.")] = None,
+    model: Annotated[str | None, typer.Option(help="Model to use for fixing (overrides the default).")] = None,
+) -> None:
+    """Add a provider. The key is read from a hidden prompt, checked live, then stored encrypted."""
+    load_env()
+    from fixer.llm.check import check_provider
+    from fixer.llm.registry import _spec_for
+    from fixer.vault.vault import mask_secret
+
+    spec0 = CATALOG.get(preset)
+    if spec0 is None:
+        console.print(f"[red]Unknown provider '{preset}'.[/] Choose from: {', '.join(CATALOG)}")
+        raise typer.Exit(2)
+    key = None
+    if spec0.needs_key:
+        if spec0.key_url:
+            console.print(f"[dim]Get a key at {spec0.key_url}[/]")
+        key = typer.prompt(f"{spec0.name} API key", hide_input=True).strip()
+    models = {"fix": model} if model else {}
+    spec = _spec_for(preset, preset, base_url, models)
+    result = check_provider(spec, key)
+    if result.kind == "auth":
+        console.print(f"[red]✗ {result.message}[/] Nothing was saved.")
+        raise typer.Exit(1)
+    db = _db()
+    pid = _vault(db).add_provider(
+        preset, label or preset, base_url, models, key, mask_secret(key, spec.key_prefix) if key else None
+    )
+    console.print(f"[green]✓ Added {pid}[/] ({result.message}). Key stored encrypted in {db.path}.")
+
+
+@providers_app.command("rotate-key")
+def providers_rotate(pid: Annotated[str, typer.Argument()]) -> None:
+    """Replace a provider's key (checked live first; the old key stays if the new one is rejected)."""
+    load_env()
+    from fixer.llm.check import check_provider
+    from fixer.vault.vault import mask_secret
+
+    db, entries = _entries()
+    e = next((x for x in entries if x.id == pid and x.source == "vault"), None)
+    if e is None:
+        console.print(f"[red]No vault provider '{pid}'.[/]")
+        raise typer.Exit(2)
+    key = typer.prompt(f"New {e.spec.name} API key", hide_input=True).strip()
+    result = check_provider(e.spec, key)
+    if result.kind == "auth":
+        console.print(f"[red]✗ {result.message}[/] The old key is unchanged.")
+        raise typer.Exit(1)
+    _vault(db).put_secret(pid, key, mask_secret(key, e.spec.key_prefix))
+    db.execute("DELETE FROM provider_status WHERE provider = ?", (pid,))
+    console.print(f"[green]✓ Key for {pid} replaced.[/]")
+
+
+@providers_app.command("order")
+def providers_order(ids: Annotated[list[str], typer.Argument(help="Vault provider ids, primary first.")]) -> None:
+    """Set the fallback order."""
+    db = _db()
+    try:
+        _vault(db).reorder(ids)
+    except ValueError as err:
+        console.print(f"[red]{err}[/]")
+        raise typer.Exit(2) from err
+    console.print("[green]✓ Order saved:[/] " + " → ".join(ids))
+
+
+@providers_app.command("enable")
+def providers_enable(pid: str) -> None:
+    db = _db()
+    _vault(db).set_enabled(pid, True)
+    console.print(f"[green]✓ {pid} enabled[/]")
+
+
+@providers_app.command("disable")
+def providers_disable(pid: str) -> None:
+    db = _db()
+    _vault(db).set_enabled(pid, False)
+    console.print(f"[green]✓ {pid} disabled[/]")
+
+
+@providers_app.command("remove")
+def providers_remove(pid: str) -> None:
+    """Remove a provider and delete its encrypted key."""
+    db = _db()
+    _vault(db).remove_provider(pid)
+    console.print(f"[green]✓ {pid} removed[/]")
+
+
+@providers_app.command("import-env")
+def providers_import_env() -> None:
+    """Move keys from backend/.env into the encrypted vault (you can then delete them from .env)."""
+    load_env()
+    from fixer.llm.providers import configured
+    from fixer.vault.vault import mask_secret
+
+    db = _db()
+    vault = _vault(db)
+    have = {p.id for p in vault.providers()}
+    moved = []
+    for spec, key in configured():
+        if spec.id in have or not key:
+            continue
+        vault.add_provider(spec.id, spec.id, None, {}, key, mask_secret(key, spec.key_prefix))
+        moved.append(spec.id)
+    if moved:
+        console.print(
+            f"[green]✓ Imported {', '.join(moved)} into the vault.[/] You can now remove those keys "
+            "from backend/.env (while they're there, they take priority)."
+        )
+    else:
+        console.print("Nothing to import.")
+
+
+@github_app.command("set-token")
+def github_set_token() -> None:
+    """Store a GitHub token (repo scope) in the encrypted vault."""
+    load_env()
+    from fixer.github.client import GitHubClient, GitHubError
+    from fixer.vault.vault import mask_secret
+
+    token = typer.prompt("GitHub token", hide_input=True).strip()
+    try:
+        login, scopes = GitHubClient(token).token_info()
+    except GitHubError as err:
+        console.print(f"[red]✗ {err}[/]")
+        raise typer.Exit(1) from err
+    db = _db()
+    _vault(db).put_secret("github", token, mask_secret(token))
+    console.print(f"[green]✓ Stored.[/] Signed in as @{login}; scopes: {', '.join(scopes) or 'fine-grained'}")
+
+
+@github_app.command("status")
+def github_status() -> None:
+    """Which GitHub token `fixer fix` will use, and whether it works."""
+    load_env()
+    from fixer.github.client import GitHubClient, GitHubError, token_source
+    from fixer.llm.registry import open_vault
+
+    token, source = token_source(open_vault(_db()))
+    if not token:
+        console.print("[yellow]No GitHub token: run `fixer github set-token` or `gh auth login`.[/]")
+        return
+    try:
+        login, scopes = GitHubClient(token).token_info()
+        console.print(f"[green]✓[/] token from {source}: @{login}, scopes {', '.join(scopes) or 'fine-grained'}")
+    except GitHubError as err:
+        console.print(f"[red]✗ token from {source} doesn't work: {err}[/]")
+
+
+@app.command()
+def serve(
+    port: Annotated[int, typer.Option(help="Port on 127.0.0.1")] = 8000,
+) -> None:
+    """Run the API server for the dashboard (localhost only)."""
+    load_env()
+    import uvicorn
+
+    from fixer.api.app import create_app
+
+    console.print(
+        f"[bold]Code Fixer API[/] on http://127.0.0.1:{port} (docs at /api/docs). Dashboard: "
+        "`cd frontend && npm run dev`."
+    )
+    uvicorn.run(create_app(), host="127.0.0.1", port=port, log_level="warning")
 
 
 @app.command()
@@ -406,7 +572,7 @@ def doctor() -> None:
         ("ripgrep (rg)", bool(shutil.which("rg"))),
         ("uv (fast Python setup)", bool(shutil.which("uv"))),
         ("docker running", docker_available()),
-        ("LLM provider key", bool(configured())),
+        ("LLM provider configured", any(e.usable for e in _entries()[1])),
     ]
     for name, ok in checks:
         console.print(("[green]✓[/] " if ok else "[yellow]✗[/] ") + name)

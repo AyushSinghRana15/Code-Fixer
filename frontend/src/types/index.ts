@@ -3,6 +3,8 @@
 export type JobStatus =
   | "queued"
   | "running"
+  | "fixed"
+  | "needs_review"
   | "paused"
   | "pr_opened"
   | "failed"
@@ -13,6 +15,7 @@ export type PhaseKey =
   | "intake"
   | "env"
   | "baseline"
+  | "context"
   | "reproduce"
   | "localize"
   | "fix"
@@ -41,7 +44,7 @@ export interface Job {
   repo: string; // owner/name
   issueNumber: number;
   issueTitle: string;
-  issueUrl: string;
+  issueUrl: string; // empty for local runs (fixer run)
   status: JobStatus;
   phase: PhaseKey;
   phases: Record<PhaseKey, PhaseState>;
@@ -93,6 +96,7 @@ export interface Provider {
   models: ModelRoles;
   trainsOnData: boolean;
   usage: { requestsToday: number; dailyLimit?: number };
+  source?: "vault" | "env"; // env: key comes from backend/.env and is managed there
 }
 
 export interface ProviderPreset {
@@ -114,6 +118,7 @@ export interface GithubCredential {
   login?: string;
   scopes: string[];
   checkedAt?: string;
+  source?: "vault" | "env" | "gh";
 }
 
 export interface StatsSummary {

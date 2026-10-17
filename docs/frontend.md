@@ -150,7 +150,9 @@ A minimal landing page with its own top nav (no sidebar):
 - An inline script handles system, light and dark before first paint, with the toggle in the header (cycles system → light → dark).
 - Times shown relative ("2m ago"), with the full timestamp on hover. Monospace for repo names, key hints and paths.
 
-## 6. What the backend needs to provide
+## 6. What the backend provides (implemented in `backend/fixer/api/`)
+
+Implemented as designed, with these additions: job statuses `fixed` (local runs, no PR) and `needs_review`; a `context` phase; `source` on providers (`vault` | `env`; env providers are read-only in the UI) and on the GitHub credential (`vault` | `env` | `gh`); `POST /api/jobs` to start a job; `GET /api/health`. The SSE stream is produced by polling the shared SQLite store once a second, so jobs started from the CLI appear too.
 
 ### 6.1 REST API (FastAPI, `backend/fixer/api/`)
 

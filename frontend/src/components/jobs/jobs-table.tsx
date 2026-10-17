@@ -96,7 +96,7 @@ export function JobsTable({ jobs, providers }: { jobs: Job[] | null; providers: 
                         type="button"
                         aria-expanded={expanded}
                         aria-controls={detailsId}
-                        aria-label={`${expanded ? "Hide" : "Show"} details for ${job.repo} #${job.issueNumber}`}
+                        aria-label={`${expanded ? "Hide" : "Show"} details for ${job.repo}${job.issueNumber ? ` #${job.issueNumber}` : ""}: ${job.issueTitle}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           toggle(job.id);
@@ -113,11 +113,12 @@ export function JobsTable({ jobs, providers }: { jobs: Job[] | null; providers: 
                   <TableCell className="max-w-[180px] sm:max-w-[320px]">
                     <div className="truncate font-mono text-xs text-muted-foreground">{job.repo}</div>
                     <div className="truncate">
-                      <span className="text-muted-foreground">#{job.issueNumber}</span> {job.issueTitle}
+                      {job.issueNumber > 0 && <span className="text-muted-foreground">#{job.issueNumber} </span>}
+                      {job.issueTitle}
                     </div>
                   </TableCell>
                   <TableCell className="hidden xl:table-cell">
-                    {["pr_opened", "queued"].includes(job.status) ? (
+                    {["pr_opened", "queued", "fixed"].includes(job.status) ? (
                       <span className="text-muted-foreground">{job.status === "queued" ? "Waiting" : "Done"}</span>
                     ) : (
                       PHASE_LABEL[job.phase]

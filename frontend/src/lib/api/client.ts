@@ -1,6 +1,6 @@
 // Typed client for the backend API (docs/frontend.md §6.1).
-// v0 runs against the in-browser mock. Set NEXT_PUBLIC_API_MODE=live to call
-// the FastAPI backend through the /api proxy in next.config.ts.
+// Talks to the FastAPI backend (`uv run fixer serve`) through the /api proxy in next.config.ts.
+// Set NEXT_PUBLIC_API_MODE=mock to use the in-browser mock instead (no backend needed).
 
 import { ApiError, getMockBackend } from "@/lib/api/mock-backend";
 import type {
@@ -15,7 +15,10 @@ import type {
 
 export { ApiError };
 
-export const API_MODE = process.env.NEXT_PUBLIC_API_MODE === "live" ? "live" : "mock";
+export const API_MODE = process.env.NEXT_PUBLIC_API_MODE === "mock" ? "mock" : "live";
+
+export const BACKEND_DOWN =
+  "Can't reach the Code Fixer API. Start it with: cd backend && uv run fixer serve";
 
 export interface NewProvider {
   preset: PresetId;
@@ -26,13 +29,19 @@ export interface NewProvider {
 }
 
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, {
+      ...init,
+      headers: { "Content-Type": "application/json", ...init?.headers },
+    });
+  } catch {
+    throw new ApiError(BACKEND_DOWN);
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    throw new ApiError(body?.detail ?? `Request failed (${res.status})`);
+    // the Next.js proxy answers 500 with an HTML page when the backend isn't running
+    throw new ApiError(body?.detail ?? (res.status >= 500 ? BACKEND_DOWN : `Request failed (${res.status})`));
   }
   return res.status === 204 ? (undefined as T) : res.json();
 }
